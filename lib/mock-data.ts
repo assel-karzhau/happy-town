@@ -68,7 +68,7 @@ export const adminEntities: Record<string, string[][]> = {
 export const pageTitles: Record<Role, Record<string, string>> = {
   parent: { home: "Главная", lessons: "Темы и уроки", words: "Слова", homework: "Домашние задания", attendance: "Посещаемость", tests: "Тесты", progress: "Прогресс", feedback: "Отзывы учителя", history: "История обучения", profile: "Профиль" },
   teacher: { home: "Главная", groups: "Мои группы", group: "Группа", attendance: "Посещаемость", lessons: "Уроки и темы", lesson: "Уроки и темы", homework: "Домашние задания", words: "Слова и прогресс", tests: "Тесты и результаты", grades: "Ежемесячные оценки", feedback: "Отзывы", students: "Ученики", profile: "Профиль" },
-  admin: { home: "Dashboard", teachers: "Учителя", parents: "Родители", students: "Ученики", groups: "Группы", courses: "Курсы", books: "Учебники", units: "Разделы", topics: "Темы", periods: "Учебные периоды", skills: "Категории навыков", archive: "Архив" },
+  admin: { home: "Панель администратора", teachers: "Учителя", parents: "Родители", students: "Ученики", groups: "Группы", courses: "Курсы", books: "Учебники", units: "Разделы и темы", topics: "Разделы и темы", periods: "Учебные периоды", skills: "Категории навыков", history: "История и журнал изменений", archive: "Архив", profile: "Профиль администратора" },
 };
 
 export const attendanceDays = [

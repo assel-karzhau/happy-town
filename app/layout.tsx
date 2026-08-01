@@ -5,15 +5,15 @@ import "./globals.css";
 const geist = Geist({ variable: "--font-geist", subsets: ["latin", "cyrillic"] });
 
 export const metadata: Metadata = {
-  title: { default: "Happy Town — Электронный дневник", template: "%s · Happy Town" },
-  description: "Электронный дневник и система отслеживания прогресса учебного центра Happy Town.",
+  title: { default: "Happy Town — управление учебным центром", template: "%s · Happy Town" },
+  description: "Единая панель Happy Town для администратора, учителей и родителей.",
   icons: { icon: "/favicon.png", shortcut: "/favicon.png" },
   openGraph: {
-    title: "Happy Town — Электронный дневник",
-    description: "Учимся. Растём. Видим прогресс.",
-    images: [{ url: "/og.png", width: 1200, height: 630, alt: "Happy Town — Электронный дневник" }],
+    title: "Happy Town — панель администратора",
+    description: "Управление всей структурой учебного центра в одном интерфейсе.",
+    images: [{ url: "/og-admin.png", width: 1200, height: 630, alt: "Happy Town — панель администратора" }],
   },
-  twitter: { card: "summary_large_image", images: ["/og.png"] },
+  twitter: { card: "summary_large_image", images: ["/og-admin.png"] },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

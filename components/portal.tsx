@@ -10,9 +10,10 @@ import {
   MoreHorizontal, Plus, Search, Settings2, Star, TrendingUp, UserRound, UsersRound, X, Bell,
 } from "lucide-react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import { adminEntities, attendanceDays, currentStudent, groups, homework, lessons, pageTitles, progressData, tests, words } from "../lib/mock-data";
+import { attendanceDays, currentStudent, homework, lessons, pageTitles, progressData, tests, words } from "../lib/mock-data";
 import type { NavItem, Role } from "../lib/types";
 import { TeacherPortal } from "./teacher-portal";
+import { AdminPortal } from "./admin-portal";
 
 const iconMap = { home: Home, lessons: BookOpen, words: GraduationCap, homework: ClipboardCheck, attendance: CalendarDays, tests: FileText, progress: TrendingUp, feedback: MessageSquareText, history: History, profile: UserRound, groups: UsersRound, group: UsersRound, lesson: Plus, grades: ChartNoAxesCombined, teachers: UserRound, parents: UsersRound, students: GraduationCap, courses: BookOpen, books: BookOpen, units: LayoutGrid, topics: FileText, periods: CalendarDays, skills: Star, archive: Archive } as const;
 
@@ -28,9 +29,9 @@ const nav: Record<Role, NavItem[]> = {
     ["Отзывы", "feedback"], ["Ученики", "students"], ["Профиль", "profile"],
   ].map(([label, icon]) => ({ label, icon, href: icon === "home" ? "/teacher" : `/teacher/${icon}` })),
   admin: [
-    ["Dashboard", "home"], ["Учителя", "teachers"], ["Родители", "parents"], ["Ученики", "students"], ["Группы", "groups"],
-    ["Курсы", "courses"], ["Учебники", "books"], ["Разделы", "units"], ["Темы", "topics"], ["Учебные периоды", "periods"],
-    ["Категории навыков", "skills"], ["Архив", "archive"],
+    ["Главная", "home"], ["Учителя", "teachers"], ["Родители", "parents"], ["Ученики", "students"], ["Группы", "groups"],
+    ["Курсы", "courses"], ["Учебники", "books"], ["Разделы и темы", "units"], ["Учебные периоды", "periods"],
+    ["Категории навыков", "skills"], ["История обучения", "history"], ["Архив", "archive"], ["Профиль", "profile"],
   ].map(([label, icon]) => ({ label, icon, href: icon === "home" ? "/admin" : `/admin/${icon}` })),
 };
 
@@ -95,8 +96,14 @@ function MobileNav({ role, active }: { role: Role; active: string }) {
     const moreItems=nav.teacher.filter((item)=>["lessons","homework","words","tests","grades","feedback","profile"].includes(item.icon));
     return <><nav className="mobile-nav" aria-label="Мобильная навигация">{items.map((item)=>{const Icon=iconMap[item.icon as keyof typeof iconMap]??Home;return <Link href={item.href} className={active===item.icon?"active":""} key={item.href}><Icon size={21}/><span>{item.label}</span></Link>})}<button className={moreItems.some((item)=>item.icon===active)?"active":""} onClick={()=>setMoreOpen(true)}><MoreHorizontal size={22}/><span>Ещё</span></button></nav>{moreOpen&&<div className="dialog-layer mobile-more-layer" onMouseDown={(event)=>event.target===event.currentTarget&&setMoreOpen(false)}><div className="mobile-more-sheet"><div><h2>Ещё</h2><button onClick={()=>setMoreOpen(false)} aria-label="Закрыть"><X/></button></div><nav>{moreItems.map((item)=>{const Icon=iconMap[item.icon as keyof typeof iconMap]??BookOpen;return <Link href={item.href} onClick={()=>setMoreOpen(false)} key={item.href}><Icon size={20}/><span>{item.label}</span><ChevronRight size={17}/></Link>})}</nav></div></div>}</>;
   }
+  if(role==="admin") {
+    const items=[{label:"Главная",icon:"home",href:"/admin"},{label:"Ученики",icon:"students",href:"/admin/students"},{label:"Группы",icon:"groups",href:"/admin/groups"}];
+    const userItems=nav.admin.filter(item=>["teachers","parents","students"].includes(item.icon));
+    const moreItems=nav.admin.filter(item=>!["home","students","groups","teachers","parents"].includes(item.icon));
+    return <><nav className="mobile-nav" aria-label="Мобильная навигация администратора">{items.map(item=>{const Icon=iconMap[item.icon as keyof typeof iconMap]??Home;return <Link href={item.href} className={active===item.icon?"active":""} key={item.href}><Icon size={21}/><span>{item.label}</span></Link>})}<button className={["teachers","parents"].includes(active)?"active":""} onClick={()=>setMoreOpen(true)}><UsersRound size={21}/><span>Люди</span></button><button className={moreItems.some(item=>item.icon===active)?"active":""} onClick={()=>setMoreOpen(true)}><MoreHorizontal size={22}/><span>Ещё</span></button></nav>{moreOpen&&<div className="dialog-layer mobile-more-layer" onMouseDown={event=>event.target===event.currentTarget&&setMoreOpen(false)}><div className="mobile-more-sheet"><div><h2>Управление</h2><button onClick={()=>setMoreOpen(false)} aria-label="Закрыть"><X/></button></div><nav>{[...userItems,...moreItems].map(item=>{const Icon=iconMap[item.icon as keyof typeof iconMap]??BookOpen;return <Link href={item.href} onClick={()=>setMoreOpen(false)} key={item.href}><Icon size={20}/><span>{item.label}</span><ChevronRight size={17}/></Link>})}</nav></div></div>}</>;
+  }
   const items = nav[role].slice(0, 4);
-  return <nav className="mobile-nav" aria-label="Мобильная навигация">{items.map((item) => { const Icon = iconMap[item.icon as keyof typeof iconMap] ?? Home; return <a href={item.href} className={active === item.icon ? "active" : ""} key={item.href}><Icon size={21} /><span>{item.label.split(" ")[0]}</span></a>; })}<a href={`/${role}/${role === "admin" ? "archive" : "profile"}`}><MoreHorizontal size={22} /><span>Ещё</span></a></nav>;
+  return <nav className="mobile-nav" aria-label="Мобильная навигация">{items.map((item) => { const Icon = iconMap[item.icon as keyof typeof iconMap] ?? Home; return <a href={item.href} className={active === item.icon ? "active" : ""} key={item.href}><Icon size={21} /><span>{item.label.split(" ")[0]}</span></a>; })}<a href={`/${role}/profile`}><MoreHorizontal size={22} /><span>Ещё</span></a></nav>;
 }
 
 function FilterBar({ search = true }: { search?: boolean }) {
@@ -144,14 +151,6 @@ function HistoryPage() { return <SectionCard><div className="timeline">{[["15 м
 
 function ProfilePage() { return <div className="two-col"><SectionCard title="Данные родителя"><div className="profile-hero"><span className="avatar big">МС</span><div><h3>Мама Амины</h3><p>Родитель · 2 ребёнка</p></div></div><dl className="profile-dl"><div><dt>Телефон</dt><dd>+7 701 524 1191</dd></div><div><dt>Email</dt><dd>serikova@example.com</dd></div><div><dt>Язык интерфейса</dt><dd>Русский</dd></div></dl><Button secondary>Редактировать данные</Button></SectionCard><SectionCard title="Дети"><div className="child-profile"><div className="student-avatar small">АС</div><div><h3>{currentStudent.name}</h3><p>{currentStudent.group} · {currentStudent.level}</p><small>{currentStudent.teacher} · {currentStudent.book}</small><small>Период: сентябрь 2024 — май 2025</small></div><ChevronRight/></div><div className="child-profile"><div className="student-avatar small blue">ДС</div><div><h3>Данияр Сериков</h3><p>Kids A1 · Beginner</p><small>Максим Станиславов · Academy Stars 1</small><small>Период: январь — май 2025</small></div><ChevronRight/></div></SectionCard></div> }
 
-function AdminDashboard() { return <><div className="stats-grid"><StatCard icon={GraduationCap} label="Ученики" value="148" note="+12 за месяц"/><StatCard icon={UserRound} label="Учителя" value="12" note="10 активны"/><StatCard icon={UsersRound} label="Группы" value="21" note="4 уровня"/><StatCard icon={CalendarDays} label="Занятия" value="326" note="в этом месяце"/></div><div className="two-col"><SectionCard title="Наполняемость групп"><div className="bar-list">{groups.map(g=><div key={g[0]}><span>{g[0]}</span><i><b style={{width:g[5]}}/></i><strong>{g[3]}</strong></div>)}</div></SectionCard><SectionCard title="Последние действия"><div className="event-list">{[[Plus,"Создана группа Kids A1","Сегодня, 10:42"],[UserRound,"Добавлен учитель","Вчера, 16:20"],[Archive,"Ученик перемещён в архив","30 июля, 12:04"]].map(([Icon,text,date])=><div className="event" key={String(text)}><span><Icon size={18}/></span><p><b>{String(text)}</b><small>{String(date)}</small></p></div>)}</div></SectionCard></div></> }
-
-function AdminEntity({ entity }: { entity: string }) {
-  const rows=adminEntities[entity]??[];
-  const headersBy:Record<string,string[]>={teachers:["Учитель","Нагрузка","Ученики","Статус"],parents:["Родитель","Телефон","Дети","Статус"],students:["Ученик","Группа","Уровень","Статус"],groups:["Группа","Уровень","Учебник","Ученики","Раздел","Прогресс"],courses:["Курс","Уровни","Группы","Статус"],books:["Учебник","Уровень","Издательство","Разделы"],units:["Раздел","Учебник","Темы","Статус"],topics:["Тема","Раздел","Дата","Статус"],periods:["Период","Начало","Окончание","Статус"],skills:["Навык","Описание","Шкала","Статус"],archive:["Название","Тип","Причина","Дата"]};
-  return <><div className="page-actions"><FilterBar/><Button><Plus size={17}/>Добавить</Button></div><SectionCard><DataTable headers={headersBy[entity]??["Название","Данные","Статус"]} rows={rows}/><div className="pagination"><button disabled>Назад</button><span>1 <b>из 4</b></span><button>Вперёд</button></div></SectionCard></>;
-}
-
 function GenericDataPage({ type }: { type: string }) {
   if(type==="words") return <><FilterBar/><SectionCard><DataTable headers={["Слово","Перевод","Тема","Раздел","Дата изучения","Статус"]} rows={words}/></SectionCard></>;
   if(type==="tests") return <><FilterBar search={false}/><SectionCard><DataTable headers={["Название теста","Раздел","Дата","Балл","Максимум","Процент","Комментарий","Статус"]} rows={tests}/></SectionCard><SectionCard title="Навыки · Unit 2 Test" className="skill-details"><div className="bar-list">{[["Speaking","9 / 10","90%"],["Listening","8 / 10","80%"],["Reading","8 / 10","80%"],["Writing","7 / 10","70%"]].map(([skill,value,width])=><div key={skill}><span>{skill}</span><i><b style={{width}}/></i><strong>{value}</strong></div>)}</div></SectionCard></>;
@@ -167,8 +166,7 @@ function PageContent({ role, page }: { role: Role; page: string }) {
   if(role==="teacher") {
     return <TeacherPortal page={page} ui={{Button,SectionCard,StatusBadge,StatCard}}/>;
   }
-  if(page==="home") return <AdminDashboard/>;
-  return <AdminEntity entity={page}/>;
+  return <AdminPortal page={page}/>;
 }
 
 export function Portal() {
