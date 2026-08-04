@@ -13,10 +13,11 @@ import {
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { attendanceDays, currentStudent, homework, lessons, pageTitles, progressData, tests, words } from "../lib/mock-data";
 import type { NavItem, Role } from "../lib/types";
-import { TeacherPortal } from "./teacher-portal";
 import { AdminPortal } from "./admin-portal";
 import { AdminDatabasePortal } from "./admin-database-portal";
 import type { AdminPortalData } from "../lib/types/admin-api";
+import type { RolePortalData } from "../lib/types/role-portal";
+import { ParentDatabasePortal, TeacherDatabasePortal } from "./role-database-portal";
 import { EntityStatusBadge } from "./ui/entity-status-badge";
 
 const iconMap = { home: Home, lessons: BookOpen, words: GraduationCap, homework: ClipboardCheck, attendance: CalendarDays, tests: FileText, progress: TrendingUp, feedback: MessageSquareText, history: History, profile: UserRound, groups: UsersRound, group: UsersRound, lesson: Plus, grades: ChartNoAxesCombined, teachers: UserRound, parents: UsersRound, students: GraduationCap, courses: BookOpen, books: BookOpen, units: LayoutGrid, topics: FileText, periods: CalendarDays, skills: Star, archive: Archive } as const;
@@ -169,18 +170,19 @@ function GenericDataPage({ type }: { type: string }) {
   return <EmptyState/>;
 }
 
-function PageContent({ role, page, adminData }: { role: Role; page: string; adminData?:AdminPortalData }) {
+function PageContent({ role, page, adminData, roleData }: { role: Role; page: string; adminData?:AdminPortalData; roleData?:RolePortalData }) {
   if(role==="parent") {
+    if(roleData?.kind==="parent") return <ParentDatabasePortal data={roleData}/>;
     if(page==="home") return <ParentHome/>; if(page==="lessons") return <LessonsPage/>; if(page==="attendance") return <AttendancePage/>; if(page==="progress") return <ProgressPage/>; if(page==="feedback") return <FeedbackPage/>; if(page==="history") return <HistoryPage/>; if(page==="profile") return <ProfilePage/>; return <GenericDataPage type={page}/>;
   }
   if(role==="teacher") {
-    return <TeacherPortal page={page} ui={{Button,SectionCard,StatusBadge,StatCard}}/>;
+    return roleData?.kind==="teacher"?<TeacherDatabasePortal data={roleData}/>:null;
   }
   if(adminData&&["home","parents","teachers","students","groups","archive"].includes(page)) return <AdminDatabasePortal page={page} initial={adminData}/>;
   return <AdminPortal page={page}/>;
 }
 
-export function Portal({user,adminData}:{user:{name:string;email:string};adminData?:AdminPortalData}) {
+export function Portal({user,adminData,roleData}:{user:{name:string;email:string};adminData?:AdminPortalData;roleData?:RolePortalData}) {
   const pathname=usePathname();
   const parts=pathname.split("/").filter(Boolean);
   const role=(parts[0]&&["parent","teacher","admin"].includes(parts[0])?parts[0]:"parent") as Role;
@@ -189,5 +191,5 @@ export function Portal({user,adminData}:{user:{name:string;email:string};adminDa
   const [drawer,setDrawer]=useState(false);
   const [logoutOpen,setLogoutOpen]=useState(false);
   const active=useMemo(()=>page,[page]);
-  return <div className="app-shell"><AppSidebar role={role} active={active}/><div className={`mobile-drawer ${drawer?"open":""}`}><button onClick={()=>setDrawer(false)} aria-label="Закрыть меню"><X/></button><AppSidebar role={role} active={active}/></div>{drawer&&<button className="drawer-backdrop" onClick={()=>setDrawer(false)} aria-label="Закрыть меню"/>}<main><Topbar title={title} onMenu={()=>setDrawer(true)} onLogout={()=>setLogoutOpen(true)} user={user}/><div className="content"><PageContent role={role} page={page} adminData={adminData}/></div></main><MobileNav role={role} active={active} onLogout={()=>setLogoutOpen(true)}/><LogoutDialog open={logoutOpen} onClose={()=>setLogoutOpen(false)}/></div>;
+  return <div className="app-shell"><AppSidebar role={role} active={active}/><div className={`mobile-drawer ${drawer?"open":""}`}><button onClick={()=>setDrawer(false)} aria-label="Закрыть меню"><X/></button><AppSidebar role={role} active={active}/></div>{drawer&&<button className="drawer-backdrop" onClick={()=>setDrawer(false)} aria-label="Закрыть меню"/>}<main><Topbar title={title} onMenu={()=>setDrawer(true)} onLogout={()=>setLogoutOpen(true)} user={user}/><div className="content"><PageContent role={role} page={page} adminData={adminData} roleData={roleData}/></div></main><MobileNav role={role} active={active} onLogout={()=>setLogoutOpen(true)}/><LogoutDialog open={logoutOpen} onClose={()=>setLogoutOpen(false)}/></div>;
 }

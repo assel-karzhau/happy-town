@@ -1,0 +1,2 @@
+import { requireParent } from "../../../lib/auth/authorization";import { getParentChildReviews } from "../../../lib/repositories/parent-pages.repository";import { ParentReviewsPage } from "../../../components/parent-pages";
+export const dynamic="force-dynamic";export const revalidate=0;export default async function Page({searchParams}:{searchParams:Promise<{child?:string}>}){const user=await requireParent(),{child}=await searchParams;return <ParentReviewsPage data={await getParentChildReviews(user.userId,child)}/>}

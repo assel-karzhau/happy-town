@@ -22,6 +22,8 @@
     "db:studio": "prisma studio",
     "typecheck": "tsc --noEmit",
     "verify:access": "tsx scripts/verify-access.ts",
+    "verify:roles": "tsx scripts/verify-role-portals.ts",
+    "verify:diary": "tsx scripts/verify-diary-pages.ts",
     "db:d1:generate": "drizzle-kit generate"
   },
   "dependencies": {

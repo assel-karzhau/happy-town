@@ -9,7 +9,9 @@ export type SessionUser = { userId: string; role: UserRole; name: string; email:
 export async function getCurrentUser(): Promise<SessionUser | null> {
   const session = await auth();
   if (!session?.user?.id || !session.user.role || !session.user.email) return null;
-  return { userId: session.user.id, role: session.user.role, name: session.user.name ?? session.user.email, email: session.user.email };
+  const current = await prisma.user.findFirst({ where: { id: session.user.id, status: "ACTIVE", archivedAt: null }, select: { id:true,role:true,email:true,firstName:true,lastName:true } });
+  if (!current?.email) return null;
+  return { userId: current.id, role: current.role, name: `${current.firstName} ${current.lastName}`, email: current.email };
 }
 
 export async function requireUser(): Promise<SessionUser> {
@@ -36,7 +38,7 @@ export async function requirePageRole(role: UserRole, returnTo: string): Promise
 }
 
 export async function teacherCanAccessGroup(teacherId: string, groupId: string) {
-  return Boolean(await prisma.teacherGroupAssignment.findFirst({ where: { teacherId, groupId, isCurrent: true, endedAt: null }, select: { id: true } }));
+  return Boolean(await prisma.teacherGroupAssignment.findFirst({ where: { teacherId, groupId, isCurrent: true, endedAt: null, teacher:{status:"ACTIVE",archivedAt:null}, group:{archivedAt:null} }, select: { id: true } }));
 }
 
 export async function teacherCanAccessStudent(teacherId: string, studentId: string) {

@@ -1,0 +1,1 @@
+"use client";export default function Error({reset}:{reset:()=>void}){return <section className="section-card error-state"><h2>Не удалось загрузить раздел</h2><p>Попробуйте обновить страницу.</p><button className="btn" onClick={reset}>Повторить</button></section>}

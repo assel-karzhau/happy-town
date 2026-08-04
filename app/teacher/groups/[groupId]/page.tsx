@@ -1,0 +1,2 @@
+import { requireTeacher } from "../../../../lib/auth/authorization";import { getTeacherGroup } from "../../../../lib/repositories/teacher-pages.repository";import { TeacherGroupPage } from "../../../../components/teacher-pages";
+export const dynamic="force-dynamic";export const revalidate=0;export default async function Page({params}:{params:Promise<{groupId:string}>}){const user=await requireTeacher(),{groupId}=await params;return <TeacherGroupPage data={await getTeacherGroup(user.userId,groupId)}/>}

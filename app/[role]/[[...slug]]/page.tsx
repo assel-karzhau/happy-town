@@ -9,7 +9,8 @@ export const runtime="nodejs";
 
 export default async function PortalPage({params}:{params:Promise<{role:string;slug?:string[]}>}) {
   const {role,slug=[]}=await params;
-  const roleMap:Record<string,UserRole>={admin:"ADMIN",teacher:"TEACHER",parent:"PARENT"};
+  if(role!=="admin")notFound();
+  const roleMap:Record<string,UserRole>={admin:"ADMIN"};
   const requiredRole=roleMap[role]; if(!requiredRole) notFound();
   const path=`/${role}${slug.length?`/${slug.join("/")}`:""}`;
   const user=await requirePageRole(requiredRole,path);

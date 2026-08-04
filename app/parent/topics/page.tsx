@@ -1,0 +1,2 @@
+import { requireParent } from "../../../lib/auth/authorization";import { getParentChildTopics } from "../../../lib/repositories/parent-pages.repository";import { ParentTopicsPage } from "../../../components/parent-pages";
+export const dynamic="force-dynamic";export const revalidate=0;export default async function Page({searchParams}:{searchParams:Promise<{child?:string}>}){const user=await requireParent(),{child}=await searchParams;return <ParentTopicsPage data={await getParentChildTopics(user.userId,child)}/>}

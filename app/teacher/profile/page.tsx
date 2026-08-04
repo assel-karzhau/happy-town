@@ -1,0 +1,2 @@
+import { requireTeacher } from "../../../lib/auth/authorization";import { getTeacherProfile } from "../../../lib/repositories/teacher-pages.repository";import { TeacherProfilePage } from "../../../components/teacher-pages";import { ProfileEditor } from "../../../components/profile-editor";
+export const dynamic="force-dynamic";export const revalidate=0;export default async function Page(){const user=await requireTeacher(),data=await getTeacherProfile(user.userId);return <><ProfileEditor profile={data}/><TeacherProfilePage data={data}/></>}

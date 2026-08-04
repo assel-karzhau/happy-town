@@ -11,7 +11,7 @@ export async function addStudentsToGroup(raw:unknown,actor:AuthenticatedActor|nu
   const trusted=requireRole(actor,["ADMIN"]),input=z.object({groupId:id,studentIds:z.array(id).min(1).max(100)}).parse(raw);
   const uniqueStudentIds=[...new Set(input.studentIds)];
   return prisma.$transaction(async tx=>{
-    const group=await tx.group.findFirst({where:{id:input.groupId,archivedAt:null},select:{id:true,name:true,capacity:true,enrollments:{where:{status:"ACTIVE"},select:{studentId:true}}}});
+    const group=await tx.group.findFirst({where:{id:input.groupId,archivedAt:null,status:{in:["RECRUITING","ACTIVE"]}},select:{id:true,name:true,capacity:true,enrollments:{where:{status:"ACTIVE"},select:{studentId:true}}}});
     if(!group)throw new AppError("NOT_FOUND","Группа не найдена",404);
     const newIds=uniqueStudentIds.filter(studentId=>!group.enrollments.some(row=>row.studentId===studentId));
     if(group.enrollments.length+newIds.length>group.capacity)throw new AppError("BUSINESS_RULE_VIOLATION",`В группе доступно только ${Math.max(0,group.capacity-group.enrollments.length)} мест`,409);

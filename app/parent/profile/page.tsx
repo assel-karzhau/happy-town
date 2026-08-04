@@ -1,0 +1,2 @@
+import { requireParent } from "../../../lib/auth/authorization";import { getParentProfile } from "../../../lib/repositories/parent-pages.repository";import { ParentProfilePage } from "../../../components/parent-pages";import { ProfileEditor } from "../../../components/profile-editor";
+export const dynamic="force-dynamic";export const revalidate=0;export default async function Page(){const user=await requireParent(),data=await getParentProfile(user.userId);return <><ProfileEditor profile={data.parent}/><ParentProfilePage data={data}/></>}

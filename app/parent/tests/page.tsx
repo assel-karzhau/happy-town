@@ -1,0 +1,2 @@
+import { requireParent } from "../../../lib/auth/authorization";import { getParentChildTests } from "../../../lib/repositories/parent-pages.repository";import { ParentTestsPage } from "../../../components/parent-pages";
+export const dynamic="force-dynamic";export const revalidate=0;export default async function Page({searchParams}:{searchParams:Promise<{child?:string}>}){const user=await requireParent(),{child}=await searchParams;return <ParentTestsPage data={await getParentChildTests(user.userId,child)}/>}
