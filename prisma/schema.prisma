@@ -151,6 +151,7 @@ enum AuditAction {
   CREATE
   UPDATE
   ARCHIVE
+  DELETE
   RESTORE
   LINK
   UNLINK

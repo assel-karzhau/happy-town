@@ -45,5 +45,5 @@ export interface AcademicPeriod { id: string; name: string; startDate: string; e
 export interface SkillCategory { id: string; name: string; description: string; maxScore: number; color: string; status: EntityStatus }
 export interface LearningHistoryEvent { id: string; studentId: string; groupId?: string; date: string; type: string; title: string; details: string }
 export interface AuditLogEntry { id: string; date: string; actor: string; action: string; entity: string; details: string }
-export interface ArchivedEntity { id: string; sourceId: string; entityType: string; name: string; reason: string; archivedAt: string }
-
+export type ArchiveEntityKind = "parents"|"teachers"|"students"|"groups"|"courses"|"books"|"units"|"topics";
+export interface ArchivedEntity { id: string; sourceId: string; entityType: string; name: string; reason: string; archivedAt: string; kind?:ArchiveEntityKind }

@@ -31,7 +31,7 @@ const studentDto = (row: Prisma.StudentGetPayload<{select:typeof studentSelect}>
 const groupDto = (row: Prisma.GroupGetPayload<{select:typeof groupSelect}>): AdminGroup => ({ id:row.id,name:row.name,level:row.level,teacherId:row.teacherAssignments[0]?.teacherId,bookId:row.bookId,periodId:row.academicPeriodId,capacity:row.capacity,studentIds:row.enrollments.map(item=>item.studentId),status:status(row.status) });
 
 export async function getAdminPortalData(): Promise<AdminPortalData> {
-  const [parents,teachers,students,groups,courses,books,periods,archivedUsers,archivedStudents,archivedGroups] = await Promise.all([
+  const [parents,teachers,students,groups,courses,books,periods,archivedUsers,archivedStudents,archivedGroups,archivedCourses,archivedBooks,archivedUnits,archivedTopics] = await Promise.all([
     prisma.user.findMany({where:{role:"PARENT",archivedAt:null},select:userSelect,orderBy:[{lastName:"asc"},{firstName:"asc"}]}),
     prisma.user.findMany({where:{role:"TEACHER",archivedAt:null},select:userSelect,orderBy:[{lastName:"asc"},{firstName:"asc"}]}),
     prisma.student.findMany({where:{archivedAt:null},select:studentSelect,orderBy:[{lastName:"asc"},{firstName:"asc"}]}),
@@ -42,11 +42,19 @@ export async function getAdminPortalData(): Promise<AdminPortalData> {
     prisma.user.findMany({where:{archivedAt:{not:null},role:{in:["PARENT","TEACHER"]}},select:{id:true,firstName:true,lastName:true,role:true,archivedAt:true}}),
     prisma.student.findMany({where:{archivedAt:{not:null}},select:{id:true,firstName:true,lastName:true,archivedAt:true}}),
     prisma.group.findMany({where:{archivedAt:{not:null}},select:{id:true,name:true,archivedAt:true}}),
+    prisma.course.findMany({where:{archivedAt:{not:null}},select:{id:true,name:true,archivedAt:true}}),
+    prisma.book.findMany({where:{archivedAt:{not:null}},select:{id:true,name:true,archivedAt:true}}),
+    prisma.unit.findMany({where:{archivedAt:{not:null}},select:{id:true,name:true,archivedAt:true}}),
+    prisma.topic.findMany({where:{archivedAt:{not:null}},select:{id:true,name:true,archivedAt:true}}),
   ]);
   const archived: ArchivedEntity[] = [
-    ...archivedUsers.map(row=>archiveDto(row.id,row.role==="PARENT"?"Родитель":"Учитель",fullName(row),row.archivedAt)),
-    ...archivedStudents.map(row=>archiveDto(row.id,"Ученик",fullName(row),row.archivedAt)),
-    ...archivedGroups.map(row=>archiveDto(row.id,"Группа",row.name,row.archivedAt)),
+    ...archivedUsers.map(row=>archiveDto(row.id,row.role==="PARENT"?"parents":"teachers",row.role==="PARENT"?"Родитель":"Учитель",fullName(row),row.archivedAt)),
+    ...archivedStudents.map(row=>archiveDto(row.id,"students","Ученик",fullName(row),row.archivedAt)),
+    ...archivedGroups.map(row=>archiveDto(row.id,"groups","Группа",row.name,row.archivedAt)),
+    ...archivedCourses.map(row=>archiveDto(row.id,"courses","Курс",row.name,row.archivedAt)),
+    ...archivedBooks.map(row=>archiveDto(row.id,"books","Учебник",row.name,row.archivedAt)),
+    ...archivedUnits.map(row=>archiveDto(row.id,"units","Раздел",row.name,row.archivedAt)),
+    ...archivedTopics.map(row=>archiveDto(row.id,"topics","Тема",row.name,row.archivedAt)),
   ].sort((a,b)=>b.archivedAt.localeCompare(a.archivedAt));
   return {
     parents:parents.map(parentDto),teachers:teachers.map(teacherDto),students:students.map(studentDto),groups:groups.map(groupDto),archived,
@@ -54,7 +62,7 @@ export async function getAdminPortalData(): Promise<AdminPortalData> {
   };
 }
 
-function archiveDto(sourceId:string,entityType:string,name:string,archivedAt:Date|null):ArchivedEntity { return {id:`${entityType}:${sourceId}`,sourceId,entityType,name,reason:"Архивировано администратором",archivedAt:dateOnly(archivedAt)}; }
+function archiveDto(sourceId:string,kind:NonNullable<ArchivedEntity["kind"]>,entityType:string,name:string,archivedAt:Date|null):ArchivedEntity { return {id:`${entityType}:${sourceId}`,sourceId,kind,entityType,name,reason:"Архивировано администратором",archivedAt:dateOnly(archivedAt)}; }
 
 export async function listAdminEntities(kind:AdminEntityKind, options:{query?:string;status?:"active"|"archived";sort?:"name"|"newest";page:number;pageSize:number}) {
   const {query="",status:filter="active",sort="newest",page,pageSize}=options;

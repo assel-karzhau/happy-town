@@ -7,6 +7,28 @@ import { writeAuditLog } from "./audit.service";
 
 const id=z.string().uuid();
 
+export async function addStudentsToGroup(raw:unknown,actor:AuthenticatedActor|null){
+  const trusted=requireRole(actor,["ADMIN"]),input=z.object({groupId:id,studentIds:z.array(id).min(1).max(100)}).parse(raw);
+  const uniqueStudentIds=[...new Set(input.studentIds)];
+  return prisma.$transaction(async tx=>{
+    const group=await tx.group.findFirst({where:{id:input.groupId,archivedAt:null},select:{id:true,name:true,capacity:true,enrollments:{where:{status:"ACTIVE"},select:{studentId:true}}}});
+    if(!group)throw new AppError("NOT_FOUND","Группа не найдена",404);
+    const newIds=uniqueStudentIds.filter(studentId=>!group.enrollments.some(row=>row.studentId===studentId));
+    if(group.enrollments.length+newIds.length>group.capacity)throw new AppError("BUSINESS_RULE_VIOLATION",`В группе доступно только ${Math.max(0,group.capacity-group.enrollments.length)} мест`,409);
+    const students=await tx.student.findMany({where:{id:{in:newIds},archivedAt:null,status:"ACTIVE"},select:{id:true}});
+    if(students.length!==newIds.length)throw new AppError("NOT_FOUND","Один или несколько учеников не найдены",404);
+    const now=new Date();
+    for(const studentId of newIds){
+      const current=await tx.studentGroupEnrollment.findFirst({where:{studentId,status:"ACTIVE"},select:{id:true,groupId:true,startedAt:true}});
+      if(current)await tx.studentGroupEnrollment.update({where:{id:current.id},data:{status:"TRANSFERRED",endedAt:now,transferReason:`Перевод в ${group.name}`}});
+      const enrollment=await tx.studentGroupEnrollment.create({data:{studentId,groupId:group.id,startedAt:now,status:"ACTIVE",transferReason:current?`Перевод в ${group.name}`:"Добавлен администратором"},select:{id:true}});
+      await tx.learningHistoryEvent.create({data:{studentId,eventType:current?"GROUP_TRANSFERRED":"GROUP_ENROLLED",eventDate:now,actorUserId:trusted.userId,groupId:group.id,title:current?`Перевод в группу ${group.name}`:`Добавлен в группу ${group.name}`,previousData:current??undefined,newData:{enrollmentId:enrollment.id,groupId:group.id}}});
+    }
+    await writeAuditLog(tx,{actorUserId:trusted.userId,action:newIds.length>1?"TRANSFER":"LINK",entityType:"GroupRoster",entityId:group.id,newData:{studentIds:newIds,count:newIds.length}});
+    return {groupId:group.id,added:newIds.length};
+  });
+}
+
 export async function unlinkParentFromStudent(raw:unknown,actor:AuthenticatedActor|null){
   const trusted=requireRole(actor,["ADMIN"]),input=z.object({parentId:id,studentId:id}).parse(raw);
   return prisma.$transaction(async tx=>{

@@ -8,7 +8,7 @@ import { useMemo, useState } from "react";
 import {
   Archive, BookOpen, CalendarDays, ChartNoAxesCombined, Check, ChevronDown, ChevronRight,
   ClipboardCheck, Clock3, FileText, GraduationCap, History, Home, LayoutGrid, Menu, MessageSquareText,
-  MoreHorizontal, Plus, Search, Settings2, Star, TrendingUp, UserRound, UsersRound, X, Bell, LogOut,
+  MoreHorizontal, Plus, Search, Settings2, Star, TrendingUp, UserRound, UsersRound, X, LogOut,
 } from "lucide-react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { attendanceDays, currentStudent, homework, lessons, pageTitles, progressData, tests, words } from "../lib/mock-data";
@@ -17,6 +17,7 @@ import { TeacherPortal } from "./teacher-portal";
 import { AdminPortal } from "./admin-portal";
 import { AdminDatabasePortal } from "./admin-database-portal";
 import type { AdminPortalData } from "../lib/types/admin-api";
+import { EntityStatusBadge } from "./ui/entity-status-badge";
 
 const iconMap = { home: Home, lessons: BookOpen, words: GraduationCap, homework: ClipboardCheck, attendance: CalendarDays, tests: FileText, progress: TrendingUp, feedback: MessageSquareText, history: History, profile: UserRound, groups: UsersRound, group: UsersRound, lesson: Plus, grades: ChartNoAxesCombined, teachers: UserRound, parents: UsersRound, students: GraduationCap, courses: BookOpen, books: BookOpen, units: LayoutGrid, topics: FileText, periods: CalendarDays, skills: Star, archive: Archive } as const;
 
@@ -43,7 +44,7 @@ function Logo({ size = 72 }: { size?: number }) {
 }
 
 function StatusBadge({ children, tone = "green" }: { children: React.ReactNode; tone?: string }) {
-  return <span className={`badge ${tone}`}>{children}</span>;
+  return <EntityStatusBadge label={String(children)} tone={tone as "green"|"gray"|"orange"|"blue"|"red"}/>;
 }
 
 function Button({ children, secondary = false, onClick, type = "button", disabled = false }: { children: React.ReactNode; secondary?: boolean; onClick?: () => void; type?: "button" | "submit"; disabled?: boolean }) {
@@ -73,22 +74,26 @@ function AppSidebar({ role, active }: { role: Role; active: string }) {
   </aside>;
 }
 
-function Topbar({ title, onMenu, user }: { title: string; onMenu: () => void; user:{name:string;email:string} }) {
+function PageHeader({title}:{title:string}) {
+  return <div className="page-heading"><p className="eyebrow">Электронный дневник</p><h1>{title}</h1></div>;
+}
+
+function Topbar({ title, onMenu, onLogout, user }: { title: string; onMenu: () => void; onLogout:()=>void; user:{name:string;email:string} }) {
   return <header className="topbar">
     <div className="mobile-header-row">
       <Logo size={62} />
       <div className="mobile-header-actions">
-        <button className="icon-btn notification" aria-label="Уведомления"><Bell size={19} /><i /></button>
         <button className="icon-btn menu-trigger" onClick={onMenu} aria-label="Открыть меню"><Menu size={21} /></button>
       </div>
     </div>
-    <div className="page-heading"><p className="eyebrow">Электронный дневник</p><h1>{title}</h1></div>
-    <div className="top-actions desktop-actions"><button className="icon-btn notification" aria-label="Уведомления"><Bell size={19} /><i /></button><div className="profile-chip"><span className="avatar">{user.name.split(" ").map(part=>part[0]).slice(0,2).join("")}</span><span><b>{user.name}</b><small>{user.email}</small></span></div><button className="icon-btn" onClick={()=>signOut({callbackUrl:"/login"})} aria-label="Выйти"><LogOut size={18}/></button></div>
+    <PageHeader title={title}/>
+    <div className="top-actions desktop-actions"><div className="profile-chip"><span className="avatar">{user.name.split(" ").map(part=>part[0]).slice(0,2).join("")}</span><span><b>{user.name}</b><small>{user.email}</small></span></div><button className="icon-btn" onClick={onLogout} aria-label="Выйти"><LogOut size={18}/></button></div>
   </header>;
 }
 
-function MobileNav({ role, active }: { role: Role; active: string }) {
+function MobileNav({ role, active, onLogout }: { role: Role; active: string;onLogout:()=>void }) {
   const [moreOpen,setMoreOpen]=useState(false);
+  const [sheet,setSheet]=useState<"people"|"more"|null>(null);
   if(role==="teacher") {
     const items=[{label:"Главная",icon:"home",href:"/teacher"},{label:"Группы",icon:"groups",href:"/teacher/groups"},{label:"Посещаемость",icon:"attendance",href:"/teacher/attendance"},{label:"Ученики",icon:"students",href:"/teacher/students"}];
     const moreItems=nav.teacher.filter((item)=>["lessons","homework","words","tests","grades","feedback","profile"].includes(item.icon));
@@ -98,10 +103,17 @@ function MobileNav({ role, active }: { role: Role; active: string }) {
     const items=[{label:"Главная",icon:"home",href:"/admin"},{label:"Ученики",icon:"students",href:"/admin/students"},{label:"Группы",icon:"groups",href:"/admin/groups"}];
     const userItems=nav.admin.filter(item=>["teachers","parents","students"].includes(item.icon));
     const moreItems=nav.admin.filter(item=>!["home","students","groups","teachers","parents"].includes(item.icon));
-    return <><nav className="mobile-nav" aria-label="Мобильная навигация администратора">{items.map(item=>{const Icon=iconMap[item.icon as keyof typeof iconMap]??Home;return <Link href={item.href} className={active===item.icon?"active":""} key={item.href}><Icon size={21}/><span>{item.label}</span></Link>})}<button className={["teachers","parents"].includes(active)?"active":""} onClick={()=>setMoreOpen(true)}><UsersRound size={21}/><span>Люди</span></button><button className={moreItems.some(item=>item.icon===active)?"active":""} onClick={()=>setMoreOpen(true)}><MoreHorizontal size={22}/><span>Ещё</span></button></nav>{moreOpen&&<div className="dialog-layer mobile-more-layer" onMouseDown={event=>event.target===event.currentTarget&&setMoreOpen(false)}><div className="mobile-more-sheet"><div><h2>Управление</h2><button onClick={()=>setMoreOpen(false)} aria-label="Закрыть"><X/></button></div><nav>{[...userItems,...moreItems].map(item=>{const Icon=iconMap[item.icon as keyof typeof iconMap]??BookOpen;return <Link href={item.href} onClick={()=>setMoreOpen(false)} key={item.href}><Icon size={20}/><span>{item.label}</span><ChevronRight size={17}/></Link>})}</nav></div></div>}</>;
+    const sheetItems=sheet==="people"?userItems:moreItems;
+    return <><nav className="mobile-nav" aria-label="Мобильная навигация администратора">{items.map(item=>{const Icon=iconMap[item.icon as keyof typeof iconMap]??Home;return <Link href={item.href} className={active===item.icon?"active":""} key={item.href}><Icon size={21}/><span>{item.label}</span></Link>})}<button className={userItems.some(item=>item.icon===active)?"active":""} onClick={()=>setSheet(value=>value==="people"?null:"people")}><UsersRound size={21}/><span>Люди</span></button><button className={moreItems.some(item=>item.icon===active)?"active":""} onClick={()=>setSheet(value=>value==="more"?null:"more")}><MoreHorizontal size={22}/><span>Ещё</span></button></nav>{sheet&&<div className="dialog-layer mobile-more-layer" onMouseDown={event=>event.target===event.currentTarget&&setSheet(null)}><div className="mobile-more-sheet" role="dialog" aria-modal="true" aria-label={sheet==="people"?"Люди":"Ещё"}><div><h2>{sheet==="people"?"Люди":"Ещё"}</h2><button onClick={()=>setSheet(null)} aria-label="Закрыть"><X/></button></div><nav>{sheetItems.map(item=>{const Icon=iconMap[item.icon as keyof typeof iconMap]??BookOpen;return <Link href={item.href} className={active===item.icon?"active":""} onClick={()=>setSheet(null)} key={item.href}><Icon size={20}/><span>{item.label}</span><ChevronRight size={17}/></Link>})}{sheet==="more"&&<button className="mobile-logout" onClick={()=>{setSheet(null);onLogout()}}><LogOut size={20}/><span>Выйти из аккаунта</span><ChevronRight size={17}/></button>}</nav></div></div>}</>;
   }
   const items = nav[role].slice(0, 4);
   return <nav className="mobile-nav" aria-label="Мобильная навигация">{items.map((item) => { const Icon = iconMap[item.icon as keyof typeof iconMap] ?? Home; return <a href={item.href} className={active === item.icon ? "active" : ""} key={item.href}><Icon size={21} /><span>{item.label.split(" ")[0]}</span></a>; })}<a href={`/${role}/profile`}><MoreHorizontal size={22} /><span>Ещё</span></a></nav>;
+}
+
+function LogoutDialog({open,onClose}:{open:boolean;onClose:()=>void}) {
+  const [busy,setBusy]=useState(false);
+  if(!open)return null;
+  return <div className="admin-modal-layer" onMouseDown={event=>event.target===event.currentTarget&&onClose()}><section className="admin-modal compact" role="dialog" aria-modal="true" aria-label="Выход из аккаунта"><header><div><span>Happy Town</span><h2>Выйти из аккаунта?</h2></div><button onClick={onClose} aria-label="Закрыть"><X/></button></header><p className="logout-copy">Вы уверены, что хотите выйти из аккаунта?</p><div className="admin-form-actions"><button className="btn secondary" onClick={onClose}>Отмена</button><button className="btn danger-btn" disabled={busy} onClick={async()=>{setBusy(true);await signOut({callbackUrl:"/login",redirect:true})}}><LogOut size={17}/>{busy?"Выходим…":"Выйти"}</button></div></section></div>;
 }
 
 function FilterBar({ search = true }: { search?: boolean }) {
@@ -175,6 +187,7 @@ export function Portal({user,adminData}:{user:{name:string;email:string};adminDa
   const page=parts[1]||"home";
   const title=pageTitles[role][page]??"Happy Town";
   const [drawer,setDrawer]=useState(false);
+  const [logoutOpen,setLogoutOpen]=useState(false);
   const active=useMemo(()=>page,[page]);
-  return <div className="app-shell"><AppSidebar role={role} active={active}/><div className={`mobile-drawer ${drawer?"open":""}`}><button onClick={()=>setDrawer(false)} aria-label="Закрыть меню"><X/></button><AppSidebar role={role} active={active}/></div>{drawer&&<button className="drawer-backdrop" onClick={()=>setDrawer(false)} aria-label="Закрыть меню"/>}<main><Topbar title={title} onMenu={()=>setDrawer(true)} user={user}/><div className="content"><PageContent role={role} page={page} adminData={adminData}/></div></main><MobileNav role={role} active={active}/></div>;
+  return <div className="app-shell"><AppSidebar role={role} active={active}/><div className={`mobile-drawer ${drawer?"open":""}`}><button onClick={()=>setDrawer(false)} aria-label="Закрыть меню"><X/></button><AppSidebar role={role} active={active}/></div>{drawer&&<button className="drawer-backdrop" onClick={()=>setDrawer(false)} aria-label="Закрыть меню"/>}<main><Topbar title={title} onMenu={()=>setDrawer(true)} onLogout={()=>setLogoutOpen(true)} user={user}/><div className="content"><PageContent role={role} page={page} adminData={adminData}/></div></main><MobileNav role={role} active={active} onLogout={()=>setLogoutOpen(true)}/><LogoutDialog open={logoutOpen} onClose={()=>setLogoutOpen(false)}/></div>;
 }
