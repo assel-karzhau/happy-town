@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../generated/prisma/client";
+import { hash } from "bcryptjs";
 
 if (process.env.NODE_ENV === "production" && process.env.ALLOW_PRODUCTION_SEED !== "true") {
   throw new Error("Production seeding is disabled. Set ALLOW_PRODUCTION_SEED=true explicitly.");
@@ -12,22 +13,32 @@ const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")
 const date = (value: string) => new Date(`${value}T00:00:00.000Z`);
 
 async function main() {
+  const adminEmail = process.env.SEED_ADMIN_EMAIL ?? "admin@happytown.local";
+  const teacherEmail = process.env.SEED_TEACHER_EMAIL ?? "teacher@happytown.local";
+  const parentEmail = process.env.SEED_PARENT_EMAIL ?? "parent@happytown.local";
+  const [adminPasswordHash, teacherPasswordHash, parentPasswordHash] = await Promise.all([
+    hash(process.env.SEED_ADMIN_PASSWORD ?? "HappyTown-Admin-2026!", 12),
+    hash(process.env.SEED_TEACHER_PASSWORD ?? "HappyTown-Teacher-2026!", 12),
+    hash(process.env.SEED_PARENT_PASSWORD ?? "HappyTown-Parent-2026!", 12),
+  ]);
   const adminId = id(1);
   await prisma.user.upsert({
-    where: { id: adminId }, update: {},
-    create: { id: adminId, email: "admin@happytown.local", firstName: "Amina", lastName: "Sarsenova", role: "ADMIN" },
+    where: { id: adminId }, update: { email: adminEmail, passwordHash: adminPasswordHash, status: "ACTIVE", archivedAt: null },
+    create: { id: adminId, email: adminEmail, firstName: "Amina", lastName: "Sarsenova", role: "ADMIN", passwordHash: adminPasswordHash },
   });
 
   const teacherIds = Array.from({ length: 4 }, (_, i) => id(10 + i));
   const teacherNames = [["Aigerim", "Nurlanova"], ["Dana", "Kim"], ["Madi", "Ospanov"], ["Elena", "Volkova"]];
   for (let i = 0; i < teacherIds.length; i++) {
     const [firstName, lastName] = teacherNames[i];
-    await prisma.user.upsert({ where: { id: teacherIds[i] }, update: {}, create: { id: teacherIds[i], email: `teacher${i + 1}@happytown.local`, firstName, lastName, role: "TEACHER", teacherProfile: { create: { bio: "English teacher", hiredAt: date(`202${2 + (i % 3)}-09-01`) } } } });
+    const email = i === 0 ? teacherEmail : `teacher${i + 1}@happytown.local`;
+    await prisma.user.upsert({ where: { id: teacherIds[i] }, update: i === 0 ? { email, passwordHash: teacherPasswordHash, status: "ACTIVE", archivedAt: null } : {}, create: { id: teacherIds[i], email, firstName, lastName, role: "TEACHER", passwordHash: i === 0 ? teacherPasswordHash : null, teacherProfile: { create: { bio: "English teacher", hiredAt: date(`202${2 + (i % 3)}-09-01`) } } } });
   }
 
   const parentIds = Array.from({ length: 18 }, (_, i) => id(100 + i));
   for (let i = 0; i < parentIds.length; i++) {
-    await prisma.user.upsert({ where: { id: parentIds[i] }, update: {}, create: { id: parentIds[i], phone: `+7701000${String(i + 1).padStart(4, "0")}`, firstName: `Parent${i + 1}`, lastName: `Family${(i % 12) + 1}`, role: "PARENT", parentProfile: { create: { preferredContact: i % 2 ? "WhatsApp" : "Phone" } } } });
+    const email = i === 0 ? parentEmail : null;
+    await prisma.user.upsert({ where: { id: parentIds[i] }, update: i === 0 ? { email, passwordHash: parentPasswordHash, status: "ACTIVE", archivedAt: null } : {}, create: { id: parentIds[i], email, phone: `+7701000${String(i + 1).padStart(4, "0")}`, firstName: `Parent${i + 1}`, lastName: `Family${(i % 12) + 1}`, role: "PARENT", passwordHash: i === 0 ? parentPasswordHash : null, parentProfile: { create: { preferredContact: i % 2 ? "WhatsApp" : "Phone" } } } });
   }
 
   const studentIds = Array.from({ length: 24 }, (_, i) => id(200 + i));

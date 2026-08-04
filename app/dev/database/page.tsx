@@ -1,10 +1,12 @@
 import { notFound } from "next/navigation";
+import { requireAdmin } from "../../../lib/auth/authorization";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 export default async function DatabaseDiagnosticsPage() {
   if (process.env.NODE_ENV !== "development") notFound();
+  await requireAdmin();
 
   let result:
     | { ok: true; counts: Record<string, number> }

@@ -1,65 +1,91 @@
 # Happy Town
 
-Happy Town is an English-school management application. The existing frontend remains intact; the repository now also contains a PostgreSQL/Prisma backend foundation for users, students, parents, teachers, curriculum, groups, lessons, attendance, homework, vocabulary, testing, monthly assessments, reviews, learning history, and audit logs.
+Happy Town is a Next.js application for managing an English school. PostgreSQL is the authoritative datastore; Prisma owns the schema, migrations and server-side data access. The admin portal provides persistent CRUD for parents, teachers, students and groups, including historical links and soft archive/restore.
 
 ## Requirements
 
-- Node.js 22.13 or newer
+- Node.js 22.13+
 - Docker Desktop with Docker Compose v2
 - npm
 
-## Local setup
+## First local run
 
-```powershell
-Copy-Item .env.example .env
+```bash
+cp .env.example .env
 npm install
 npm run db:start
 npm run db:migrate
 npm run db:seed
+npm run db:check
 npm run dev
 ```
 
-Open the application at the URL printed by the dev server. In development only, `/dev/database` checks the PostgreSQL connection and shows record counts. It returns 404 in production.
+Open `http://localhost:3000`. The seed creates three deterministic development logins (ADMIN, TEACHER and PARENT); their emails and passwords are declared in `.env`. Never reuse these passwords outside local development and never commit `.env`.
 
-The default values in `.env.example` are local-development credentials. Change all secrets outside local development and never commit `.env`.
+`/dev/database` is an ADMIN-only connection/count diagnostic in development and returns 404 in production.
 
-## Database commands
+## Database lifecycle
 
 | Command | Purpose |
 | --- | --- |
-| `npm run db:start` | Start the local PostgreSQL container |
-| `npm run db:stop` | Stop containers without deleting data |
-| `npm run db:reset` | Delete the local database volume and start a clean database |
-| `npm run db:generate` | Generate the typed Prisma client |
-| `npm run db:migrate` | Apply/create development migrations |
-| `npm run db:seed` | Load deterministic, idempotent demo data |
-| `npm run db:studio` | Open Prisma Studio |
-| `npm run db:d1:generate` | Generate legacy D1/Drizzle migrations |
+| `npm run db:start` | Start PostgreSQL and wait for its health check |
+| `npm run db:stop` | Stop containers without deleting the named volume |
+| `npm run db:reset` | **Destructive:** delete the local volume and start an empty database |
+| `npm run db:migrate` | Create/apply development migrations |
+| `npx prisma migrate deploy` | Apply committed migrations in CI/production |
+| `npm run db:generate` | Generate the Prisma client |
+| `npm run db:seed` | Load deterministic, idempotent development data |
+| `npm run db:check` | Verify connection and print safe table counts (no password/URL) |
+| `npm run db:studio` | Inspect the same PostgreSQL database with Prisma Studio |
 
-`db:reset` is destructive for the local Docker volume. The seed refuses to run when `NODE_ENV=production` unless `ALLOW_PRODUCTION_SEED=true` is explicitly set.
+Normal `docker compose down` and `npm run db:stop` preserve data in the `happy-town-postgres-data` named volume. Only `npm run db:reset` removes it. Seed refuses to run when `NODE_ENV=production` unless `ALLOW_PRODUCTION_SEED=true` is explicitly supplied.
+
+## Authentication and authorization
+
+- Auth.js Credentials verifies email/password on the server with bcrypt hashes.
+- Sessions contain only the user id, name, email and role; raw passwords and hashes never reach the client.
+- Protected pages validate the session and role on the server. Admin mutation routes independently require ADMIN and do not trust a client-supplied actor.
+- Parent/student and teacher/group/student reads apply server-side ownership checks and return safe 401/403/404 responses.
+- Login attempts, CRUD operations and relation changes write audit records without passwords or tokens.
+- The old demo role switcher is disabled; users must sign out and authenticate as another account.
 
 ## Architecture
 
-- `prisma/schema.prisma`: relational domain model and indexes.
-- `prisma/migrations`: PostgreSQL DDL, including partial unique indexes and check constraints.
-- `prisma/seed.ts`: deterministic demo dataset.
-- `lib/db/prisma.ts`: server-only Prisma singleton using the PostgreSQL driver adapter.
-- `lib/repositories`: typed read/query boundaries with explicit selections.
-- `lib/services`: role checks, transactions, lifecycle rules, history, and audit writes.
-- `lib/validators`: Zod input contracts.
-- `lib/mappers`: stable DTO shapes for frontend consumers.
+- `prisma/schema.prisma` — relational domain model, enums, indexes and lifecycle fields.
+- `prisma/migrations` — committed PostgreSQL migrations.
+- `prisma/seed.ts` — deterministic, idempotent data and hashed development accounts.
+- `lib/db/prisma.ts` — server-only Prisma singleton.
+- `lib/repositories` — explicit selections, filtering, sorting and pagination.
+- `lib/services` — transactions, authorization, archive/restore, relationship history and audit logging.
+- `app/api` — protected route handlers with normalized safe errors.
 
-Students intentionally are not authentication users. Parents and teachers are `User` records with profiles; parent-to-student, teacher-to-group, course-to-book, and student-to-group links are separate historical entities. Operational records use archive/status fields rather than physical deletion. Derived records use uniqueness constraints to prevent duplicate attendance, homework status, word progress, test results, and monthly assessments.
+Students intentionally are not authentication users. Parents and teachers are users with profiles. Parent/student, teacher/group and student/group associations are separate historical rows. Operational data uses status/archive fields instead of physical deletion.
 
-The existing D1/Drizzle files are retained for compatibility with the current Sites starter. PostgreSQL/Prisma is the authoritative target backend for the new server layer; do not mix both persistence implementations inside one business transaction.
+The legacy D1/Drizzle files remain for compatibility with the original Sites starter, but must not be mixed with PostgreSQL inside a business transaction. Local development and the Vercel-oriented build use the standard Next.js Node runtime because Prisma's query engine is not compatible with the Vinext/Cloudflare Worker runtime.
 
-## Quality checks
+## Hosted PostgreSQL and Vercel preparation
 
-```powershell
+For Neon, Supabase or another managed provider:
+
+1. Set `DATABASE_URL` to the runtime URL (pooled when recommended).
+2. Set `DIRECT_URL` to the provider's direct connection for Prisma migrations. `prisma.config.ts` prefers it when present.
+3. Generate a strong `AUTH_SECRET`, set `NEXT_PUBLIC_APP_URL` to the HTTPS application origin and use secure provider secrets.
+4. Run `npx prisma migrate deploy` from CI or a controlled release job; never run `prisma migrate dev` in a production runtime.
+5. Do not run the development seed against production.
+
+Production deployment is intentionally outside the current implementation stage.
+
+## Verification
+
+```bash
+docker compose config --quiet
 npm run db:generate
-npx tsc --noEmit
+npm run db:check
+npm run verify:access
 npm run lint
+npm run typecheck
 npm test
+npm run build
 ```
 
-For a production provider such as Neon or Supabase, use a pooled `DATABASE_URL` supported by the provider and keep migration/administrative connectivity separate when the provider recommends it. Run production migrations from CI with `prisma migrate deploy`; do not run the development migration command in a production runtime.
+The persistence acceptance check is: create through the UI, reload, restart Next.js, restart the PostgreSQL container without removing its volume, then confirm the same row via the UI and Prisma/SQL. Archive and restore should preserve its id and history.

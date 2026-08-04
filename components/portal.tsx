@@ -2,18 +2,21 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
+import { signOut } from "next-auth/react";
 import { useMemo, useState } from "react";
 import {
   Archive, BookOpen, CalendarDays, ChartNoAxesCombined, Check, ChevronDown, ChevronRight,
   ClipboardCheck, Clock3, FileText, GraduationCap, History, Home, LayoutGrid, Menu, MessageSquareText,
-  MoreHorizontal, Plus, Search, Settings2, Star, TrendingUp, UserRound, UsersRound, X, Bell,
+  MoreHorizontal, Plus, Search, Settings2, Star, TrendingUp, UserRound, UsersRound, X, Bell, LogOut,
 } from "lucide-react";
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { attendanceDays, currentStudent, homework, lessons, pageTitles, progressData, tests, words } from "../lib/mock-data";
 import type { NavItem, Role } from "../lib/types";
 import { TeacherPortal } from "./teacher-portal";
 import { AdminPortal } from "./admin-portal";
+import { AdminDatabasePortal } from "./admin-database-portal";
+import type { AdminPortalData } from "../lib/types/admin-api";
 
 const iconMap = { home: Home, lessons: BookOpen, words: GraduationCap, homework: ClipboardCheck, attendance: CalendarDays, tests: FileText, progress: TrendingUp, feedback: MessageSquareText, history: History, profile: UserRound, groups: UsersRound, group: UsersRound, lesson: Plus, grades: ChartNoAxesCombined, teachers: UserRound, parents: UsersRound, students: GraduationCap, courses: BookOpen, books: BookOpen, units: LayoutGrid, topics: FileText, periods: CalendarDays, skills: Star, archive: Archive } as const;
 
@@ -70,12 +73,7 @@ function AppSidebar({ role, active }: { role: Role; active: string }) {
   </aside>;
 }
 
-function RoleSwitcher({ role }: { role: Role }) {
-  const router = useRouter();
-  return <label className="role-switch"><span>Demo:</span><select value={role} onChange={(event) => router.push(`/${event.target.value}`)} aria-label="Демонстрационная роль"><option value="parent">Родитель</option><option value="teacher">Учитель</option><option value="admin">Администратор</option></select><ChevronDown size={14} /></label>;
-}
-
-function Topbar({ role, title, onMenu }: { role: Role; title: string; onMenu: () => void }) {
+function Topbar({ title, onMenu, user }: { title: string; onMenu: () => void; user:{name:string;email:string} }) {
   return <header className="topbar">
     <div className="mobile-header-row">
       <Logo size={62} />
@@ -85,7 +83,7 @@ function Topbar({ role, title, onMenu }: { role: Role; title: string; onMenu: ()
       </div>
     </div>
     <div className="page-heading"><p className="eyebrow">Электронный дневник</p><h1>{title}</h1></div>
-    <div className="top-actions desktop-actions"><RoleSwitcher role={role} /><button className="icon-btn notification" aria-label="Уведомления"><Bell size={19} /><i /></button><div className="profile-chip"><span className="avatar">МС</span><b>{role === "parent" ? "Мама Амины" : role === "teacher" ? "Айгуль Сериковна" : "Администратор"}</b><ChevronDown size={15} /></div></div>
+    <div className="top-actions desktop-actions"><button className="icon-btn notification" aria-label="Уведомления"><Bell size={19} /><i /></button><div className="profile-chip"><span className="avatar">{user.name.split(" ").map(part=>part[0]).slice(0,2).join("")}</span><span><b>{user.name}</b><small>{user.email}</small></span></div><button className="icon-btn" onClick={()=>signOut({callbackUrl:"/login"})} aria-label="Выйти"><LogOut size={18}/></button></div>
   </header>;
 }
 
@@ -159,17 +157,18 @@ function GenericDataPage({ type }: { type: string }) {
   return <EmptyState/>;
 }
 
-function PageContent({ role, page }: { role: Role; page: string }) {
+function PageContent({ role, page, adminData }: { role: Role; page: string; adminData?:AdminPortalData }) {
   if(role==="parent") {
     if(page==="home") return <ParentHome/>; if(page==="lessons") return <LessonsPage/>; if(page==="attendance") return <AttendancePage/>; if(page==="progress") return <ProgressPage/>; if(page==="feedback") return <FeedbackPage/>; if(page==="history") return <HistoryPage/>; if(page==="profile") return <ProfilePage/>; return <GenericDataPage type={page}/>;
   }
   if(role==="teacher") {
     return <TeacherPortal page={page} ui={{Button,SectionCard,StatusBadge,StatCard}}/>;
   }
+  if(adminData&&["home","parents","teachers","students","groups","archive"].includes(page)) return <AdminDatabasePortal page={page} initial={adminData}/>;
   return <AdminPortal page={page}/>;
 }
 
-export function Portal() {
+export function Portal({user,adminData}:{user:{name:string;email:string};adminData?:AdminPortalData}) {
   const pathname=usePathname();
   const parts=pathname.split("/").filter(Boolean);
   const role=(parts[0]&&["parent","teacher","admin"].includes(parts[0])?parts[0]:"parent") as Role;
@@ -177,5 +176,5 @@ export function Portal() {
   const title=pageTitles[role][page]??"Happy Town";
   const [drawer,setDrawer]=useState(false);
   const active=useMemo(()=>page,[page]);
-  return <div className="app-shell"><AppSidebar role={role} active={active}/><div className={`mobile-drawer ${drawer?"open":""}`}><button onClick={()=>setDrawer(false)} aria-label="Закрыть меню"><X/></button><AppSidebar role={role} active={active}/></div>{drawer&&<button className="drawer-backdrop" onClick={()=>setDrawer(false)} aria-label="Закрыть меню"/>}<main><Topbar role={role} title={title} onMenu={()=>setDrawer(true)}/><div className="content"><PageContent role={role} page={page}/></div></main><MobileNav role={role} active={active}/></div>;
+  return <div className="app-shell"><AppSidebar role={role} active={active}/><div className={`mobile-drawer ${drawer?"open":""}`}><button onClick={()=>setDrawer(false)} aria-label="Закрыть меню"><X/></button><AppSidebar role={role} active={active}/></div>{drawer&&<button className="drawer-backdrop" onClick={()=>setDrawer(false)} aria-label="Закрыть меню"/>}<main><Topbar title={title} onMenu={()=>setDrawer(true)} user={user}/><div className="content"><PageContent role={role} page={page} adminData={adminData}/></div></main><MobileNav role={role} active={active}/></div>;
 }

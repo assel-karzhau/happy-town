@@ -5,6 +5,7 @@ import "./globals.css";
 const geist = Geist({ variable: "--font-geist", subsets: ["latin", "cyrillic"] });
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"),
   title: { default: "Happy Town — управление учебным центром", template: "%s · Happy Town" },
   description: "Единая панель Happy Town для администратора, учителей и родителей.",
   icons: { icon: "/favicon.png", shortcut: "/favicon.png" },

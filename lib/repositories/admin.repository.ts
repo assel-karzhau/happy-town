@@ -1,0 +1,77 @@
+import type { Prisma } from "../../generated/prisma/client";
+import { prisma } from "../db/prisma";
+import type { AdminPortalData, AdminEntityKind } from "../types/admin-api";
+import type { AdminGroup, AdminStudent, ArchivedEntity, Parent, Teacher } from "../types";
+
+const userSelect = {
+  id:true,email:true,phone:true,firstName:true,lastName:true,status:true,archivedAt:true,
+  parentRelations:{where:{archivedAt:null},select:{studentId:true}},
+  teacherAssignments:{where:{isCurrent:true,endedAt:null},select:{groupId:true}},
+} as const;
+
+const studentSelect = {
+  id:true,firstName:true,lastName:true,dateOfBirth:true,currentLevel:true,status:true,archivedAt:true,
+  parentRelations:{where:{archivedAt:null},select:{parentId:true}},
+  enrollments:{where:{status:"ACTIVE" as const},take:1,select:{groupId:true}},
+} as const;
+
+const groupSelect = {
+  id:true,name:true,level:true,bookId:true,academicPeriodId:true,capacity:true,status:true,archivedAt:true,
+  teacherAssignments:{where:{isCurrent:true,endedAt:null},take:1,select:{teacherId:true}},
+  enrollments:{where:{status:"ACTIVE" as const},select:{studentId:true}},
+} as const;
+
+const status = (value:string) => value.toLowerCase() as "active"|"inactive"|"archived"|"draft"|"upcoming";
+const fullName = (row:{firstName:string;lastName:string}) => `${row.firstName} ${row.lastName}`;
+const dateOnly = (value:Date|null) => value ? value.toISOString().slice(0,10) : "";
+
+const parentDto = (row: Prisma.UserGetPayload<{select:typeof userSelect}>): Parent => ({ id:row.id,name:fullName(row),phone:row.phone??"",email:row.email??"",studentIds:row.parentRelations.map(item=>item.studentId),status:status(row.status) });
+const teacherDto = (row: Prisma.UserGetPayload<{select:typeof userSelect}>): Teacher => ({ id:row.id,name:fullName(row),phone:row.phone??"",email:row.email??"",groupIds:row.teacherAssignments.map(item=>item.groupId),status:status(row.status) });
+const studentDto = (row: Prisma.StudentGetPayload<{select:typeof studentSelect}>): AdminStudent => ({ id:row.id,name:fullName(row),birthDate:dateOnly(row.dateOfBirth),level:row.currentLevel??"—",groupId:row.enrollments[0]?.groupId,parentIds:row.parentRelations.map(item=>item.parentId),status:status(row.status) });
+const groupDto = (row: Prisma.GroupGetPayload<{select:typeof groupSelect}>): AdminGroup => ({ id:row.id,name:row.name,level:row.level,teacherId:row.teacherAssignments[0]?.teacherId,bookId:row.bookId,periodId:row.academicPeriodId,capacity:row.capacity,studentIds:row.enrollments.map(item=>item.studentId),status:status(row.status) });
+
+export async function getAdminPortalData(): Promise<AdminPortalData> {
+  const [parents,teachers,students,groups,courses,books,periods,archivedUsers,archivedStudents,archivedGroups] = await Promise.all([
+    prisma.user.findMany({where:{role:"PARENT",archivedAt:null},select:userSelect,orderBy:[{lastName:"asc"},{firstName:"asc"}]}),
+    prisma.user.findMany({where:{role:"TEACHER",archivedAt:null},select:userSelect,orderBy:[{lastName:"asc"},{firstName:"asc"}]}),
+    prisma.student.findMany({where:{archivedAt:null},select:studentSelect,orderBy:[{lastName:"asc"},{firstName:"asc"}]}),
+    prisma.group.findMany({where:{archivedAt:null},select:groupSelect,orderBy:{name:"asc"}}),
+    prisma.course.findMany({where:{archivedAt:null,status:"ACTIVE"},select:{id:true,name:true},orderBy:{name:"asc"}}),
+    prisma.book.findMany({where:{archivedAt:null,status:"ACTIVE"},select:{id:true,name:true,courses:{select:{courseId:true}}},orderBy:{name:"asc"}}),
+    prisma.academicPeriod.findMany({where:{archivedAt:null},select:{id:true,name:true},orderBy:{startDate:"desc"}}),
+    prisma.user.findMany({where:{archivedAt:{not:null},role:{in:["PARENT","TEACHER"]}},select:{id:true,firstName:true,lastName:true,role:true,archivedAt:true}}),
+    prisma.student.findMany({where:{archivedAt:{not:null}},select:{id:true,firstName:true,lastName:true,archivedAt:true}}),
+    prisma.group.findMany({where:{archivedAt:{not:null}},select:{id:true,name:true,archivedAt:true}}),
+  ]);
+  const archived: ArchivedEntity[] = [
+    ...archivedUsers.map(row=>archiveDto(row.id,row.role==="PARENT"?"Родитель":"Учитель",fullName(row),row.archivedAt)),
+    ...archivedStudents.map(row=>archiveDto(row.id,"Ученик",fullName(row),row.archivedAt)),
+    ...archivedGroups.map(row=>archiveDto(row.id,"Группа",row.name,row.archivedAt)),
+  ].sort((a,b)=>b.archivedAt.localeCompare(a.archivedAt));
+  return {
+    parents:parents.map(parentDto),teachers:teachers.map(teacherDto),students:students.map(studentDto),groups:groups.map(groupDto),archived,
+    catalogs:{courses,books:books.map(row=>({id:row.id,name:row.name,courseId:row.courses[0]?.courseId})),periods},
+  };
+}
+
+function archiveDto(sourceId:string,entityType:string,name:string,archivedAt:Date|null):ArchivedEntity { return {id:`${entityType}:${sourceId}`,sourceId,entityType,name,reason:"Архивировано администратором",archivedAt:dateOnly(archivedAt)}; }
+
+export async function listAdminEntities(kind:AdminEntityKind, options:{query?:string;status?:"active"|"archived";sort?:"name"|"newest";page:number;pageSize:number}) {
+  const {query="",status:filter="active",sort="newest",page,pageSize}=options;
+  const archivedAt = filter==="archived" ? {not:null} : null;
+  const skip=(page-1)*pageSize;
+  if(kind==="parents"||kind==="teachers") {
+    const role=kind==="parents"?"PARENT":"TEACHER";
+    const where:Prisma.UserWhereInput={role,archivedAt,...(query?{OR:[{firstName:{contains:query,mode:"insensitive"}},{lastName:{contains:query,mode:"insensitive"}},{email:{contains:query,mode:"insensitive"}},{phone:{contains:query}}]}:{})};
+    const [rows,total]=await Promise.all([prisma.user.findMany({where,select:userSelect,skip,take:pageSize,orderBy:sort==="name"?[{lastName:"asc"},{firstName:"asc"}]:[{createdAt:"desc"}]}),prisma.user.count({where})]);
+    return {items:kind==="parents"?rows.map(parentDto):rows.map(teacherDto),total,page,pageSize};
+  }
+  if(kind==="students") {
+    const where:Prisma.StudentWhereInput={archivedAt,...(query?{OR:[{firstName:{contains:query,mode:"insensitive"}},{lastName:{contains:query,mode:"insensitive"}},{currentLevel:{contains:query,mode:"insensitive"}}]}:{})};
+    const [rows,total]=await Promise.all([prisma.student.findMany({where,select:studentSelect,skip,take:pageSize,orderBy:sort==="name"?[{lastName:"asc"},{firstName:"asc"}]:[{createdAt:"desc"}]}),prisma.student.count({where})]);
+    return {items:rows.map(studentDto),total,page,pageSize};
+  }
+  const where:Prisma.GroupWhereInput={archivedAt,...(query?{name:{contains:query,mode:"insensitive"}}:{})};
+  const [rows,total]=await Promise.all([prisma.group.findMany({where,select:groupSelect,skip,take:pageSize,orderBy:sort==="name"?{name:"asc"}:{createdAt:"desc"}}),prisma.group.count({where})]);
+  return {items:rows.map(groupDto),total,page,pageSize};
+}

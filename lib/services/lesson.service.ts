@@ -4,10 +4,13 @@ import type { AuthenticatedActor } from "../permissions/actor";
 import { requireRole } from "../permissions/actor";
 import { createLessonSchema, saveAttendanceSchema } from "../validators";
 import { writeAuditLog } from "./audit.service";
+import { requireOwnTeacherIdentity, requireTeacherGroupAccess } from "./ownership.service";
 
 export async function createLesson(raw:unknown, actor:AuthenticatedActor|null) {
   const trusted=requireRole(actor,["ADMIN","TEACHER"]); const input=createLessonSchema.parse(raw);
   return prisma.$transaction(async tx=>{
+    requireOwnTeacherIdentity(trusted,input.teacherId);
+    await requireTeacherGroupAccess(tx,trusted,input.groupId);
     const [group,unit,topic,assignment]=await Promise.all([
       tx.group.findFirst({where:{id:input.groupId,archivedAt:null,status:{not:"ARCHIVED"}},select:{id:true,bookId:true,academicPeriodId:true}}),
       tx.unit.findFirst({where:{id:input.unitId,bookId:input.bookId,archivedAt:null},select:{id:true}}),
@@ -28,6 +31,7 @@ export async function saveAttendance(raw:unknown, actor:AuthenticatedActor|null)
   return prisma.$transaction(async tx=>{
     const lesson=await tx.lesson.findFirst({where:{id:input.lessonId,archivedAt:null},select:{id:true,groupId:true,lessonDate:true,status:true}});
     if(!lesson) throw new AppError("NOT_FOUND","Урок не найден",404);
+    await requireTeacherGroupAccess(tx,trusted,lesson.groupId);
     const studentIds=input.entries.map(entry=>entry.studentId);
     const enrolled=await tx.studentGroupEnrollment.findMany({where:{studentId:{in:studentIds},groupId:lesson.groupId,startedAt:{lte:lesson.lessonDate},OR:[{endedAt:null},{endedAt:{gte:lesson.lessonDate}}]},select:{studentId:true}});
     const allowed=new Set(enrolled.map(row=>row.studentId));

@@ -146,6 +146,8 @@ enum LearningEventType {
 }
 
 enum AuditAction {
+  LOGIN
+  LOGIN_FAILED
   CREATE
   UPDATE
   ARCHIVE
