@@ -16,6 +16,10 @@ async function main() {
   const adminEmail = process.env.SEED_ADMIN_EMAIL ?? "admin@happytown.local";
   const teacherEmail = process.env.SEED_TEACHER_EMAIL ?? "teacher@happytown.local";
   const parentEmail = process.env.SEED_PARENT_EMAIL ?? "parent@happytown.local";
+  const adminIin = process.env.SEED_ADMIN_IIN ?? "000000000001";
+  const teacherIin = process.env.SEED_TEACHER_IIN ?? "000000000002";
+  const parentIin = process.env.SEED_PARENT_IIN ?? "000000000003";
+  if(![adminIin,teacherIin,parentIin].every(value=>/^\d{12}$/.test(value))||new Set([adminIin,teacherIin,parentIin]).size!==3) throw new Error("Seed IIN values must be unique 12-digit development identifiers");
   const [adminPasswordHash, teacherPasswordHash, parentPasswordHash] = await Promise.all([
     hash(process.env.SEED_ADMIN_PASSWORD ?? "HappyTown-Admin-2026!", 12),
     hash(process.env.SEED_TEACHER_PASSWORD ?? "HappyTown-Teacher-2026!", 12),
@@ -23,8 +27,8 @@ async function main() {
   ]);
   const adminId = id(1);
   await prisma.user.upsert({
-    where: { id: adminId }, update: { email: adminEmail, passwordHash: adminPasswordHash, status: "ACTIVE", archivedAt: null },
-    create: { id: adminId, email: adminEmail, firstName: "Amina", lastName: "Sarsenova", role: "ADMIN", passwordHash: adminPasswordHash },
+    where: { id: adminId }, update: { iin:adminIin, email: adminEmail, passwordHash: adminPasswordHash, status: "ACTIVE", archivedAt: null },
+    create: { id: adminId, iin:adminIin, email: adminEmail, firstName: "Amina", lastName: "Sarsenova", role: "ADMIN", passwordHash: adminPasswordHash },
   });
 
   const teacherIds = Array.from({ length: 4 }, (_, i) => id(10 + i));
@@ -32,13 +36,13 @@ async function main() {
   for (let i = 0; i < teacherIds.length; i++) {
     const [firstName, lastName] = teacherNames[i];
     const email = i === 0 ? teacherEmail : `teacher${i + 1}@happytown.local`;
-    await prisma.user.upsert({ where: { id: teacherIds[i] }, update: i === 0 ? { email, passwordHash: teacherPasswordHash, status: "ACTIVE", archivedAt: null } : {}, create: { id: teacherIds[i], email, firstName, lastName, role: "TEACHER", passwordHash: i === 0 ? teacherPasswordHash : null, teacherProfile: { create: { bio: "English teacher", hiredAt: date(`202${2 + (i % 3)}-09-01`) } } } });
+    await prisma.user.upsert({ where: { id: teacherIds[i] }, update: i === 0 ? { iin:teacherIin, email, passwordHash: teacherPasswordHash, status: "ACTIVE", archivedAt: null } : {}, create: { id: teacherIds[i], iin:i===0?teacherIin:null, email, firstName, lastName, role: "TEACHER", passwordHash: i === 0 ? teacherPasswordHash : null, teacherProfile: { create: { bio: "English teacher", hiredAt: date(`202${2 + (i % 3)}-09-01`) } } } });
   }
 
   const parentIds = Array.from({ length: 18 }, (_, i) => id(100 + i));
   for (let i = 0; i < parentIds.length; i++) {
     const email = i === 0 ? parentEmail : null;
-    await prisma.user.upsert({ where: { id: parentIds[i] }, update: i === 0 ? { email, passwordHash: parentPasswordHash, status: "ACTIVE", archivedAt: null } : {}, create: { id: parentIds[i], email, phone: `+7701000${String(i + 1).padStart(4, "0")}`, firstName: `Parent${i + 1}`, lastName: `Family${(i % 12) + 1}`, role: "PARENT", passwordHash: i === 0 ? parentPasswordHash : null, parentProfile: { create: { preferredContact: i % 2 ? "WhatsApp" : "Phone" } } } });
+    await prisma.user.upsert({ where: { id: parentIds[i] }, update: i === 0 ? { iin:parentIin, email, passwordHash: parentPasswordHash, status: "ACTIVE", archivedAt: null } : {}, create: { id: parentIds[i], iin:i===0?parentIin:null, email, phone: `+7701000${String(i + 1).padStart(4, "0")}`, firstName: `Parent${i + 1}`, lastName: `Family${(i % 12) + 1}`, role: "PARENT", passwordHash: i === 0 ? parentPasswordHash : null, parentProfile: { create: { preferredContact: i % 2 ? "WhatsApp" : "Phone" } } } });
   }
 
   const studentIds = Array.from({ length: 24 }, (_, i) => id(200 + i));

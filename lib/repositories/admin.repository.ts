@@ -4,7 +4,7 @@ import type { AdminPortalData, AdminEntityKind } from "../types/admin-api";
 import type { AdminGroup, AdminStudent, ArchivedEntity, Parent, Teacher } from "../types";
 
 const userSelect = {
-  id:true,email:true,phone:true,firstName:true,lastName:true,status:true,archivedAt:true,
+  id:true,iin:true,email:true,phone:true,firstName:true,lastName:true,status:true,archivedAt:true,
   parentRelations:{where:{archivedAt:null},select:{studentId:true}},
   teacherAssignments:{where:{isCurrent:true,endedAt:null},select:{groupId:true}},
 } as const;
@@ -24,9 +24,10 @@ const groupSelect = {
 const status = (value:string) => value.toLowerCase() as "active"|"inactive"|"archived"|"draft"|"upcoming";
 const fullName = (row:{firstName:string;lastName:string}) => `${row.firstName} ${row.lastName}`;
 const dateOnly = (value:Date|null) => value ? value.toISOString().slice(0,10) : "";
+const maskedIin = (value:string|null) => value ? `********${value.slice(-4)}` : undefined;
 
-const parentDto = (row: Prisma.UserGetPayload<{select:typeof userSelect}>): Parent => ({ id:row.id,name:fullName(row),phone:row.phone??"",email:row.email??"",studentIds:row.parentRelations.map(item=>item.studentId),status:status(row.status) });
-const teacherDto = (row: Prisma.UserGetPayload<{select:typeof userSelect}>): Teacher => ({ id:row.id,name:fullName(row),phone:row.phone??"",email:row.email??"",groupIds:row.teacherAssignments.map(item=>item.groupId),status:status(row.status) });
+const parentDto = (row: Prisma.UserGetPayload<{select:typeof userSelect}>): Parent => ({ id:row.id,name:fullName(row),phone:row.phone??"",email:row.email??"",maskedIin:maskedIin(row.iin),studentIds:row.parentRelations.map(item=>item.studentId),status:status(row.status) });
+const teacherDto = (row: Prisma.UserGetPayload<{select:typeof userSelect}>): Teacher => ({ id:row.id,name:fullName(row),phone:row.phone??"",email:row.email??"",maskedIin:maskedIin(row.iin),groupIds:row.teacherAssignments.map(item=>item.groupId),status:status(row.status) });
 const studentDto = (row: Prisma.StudentGetPayload<{select:typeof studentSelect}>): AdminStudent => ({ id:row.id,name:fullName(row),birthDate:dateOnly(row.dateOfBirth),level:row.currentLevel??"—",groupId:row.enrollments[0]?.groupId,parentIds:row.parentRelations.map(item=>item.parentId),status:status(row.status) });
 const groupDto = (row: Prisma.GroupGetPayload<{select:typeof groupSelect}>): AdminGroup => ({ id:row.id,name:row.name,level:row.level,teacherId:row.teacherAssignments[0]?.teacherId,bookId:row.bookId,periodId:row.academicPeriodId,capacity:row.capacity,studentIds:row.enrollments.map(item=>item.studentId),status:status(row.status) });
 

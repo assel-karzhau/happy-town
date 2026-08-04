@@ -8,10 +8,10 @@ export type SessionUser = { userId: string; role: UserRole; name: string; email:
 
 export async function getCurrentUser(): Promise<SessionUser | null> {
   const session = await auth();
-  if (!session?.user?.id || !session.user.role || !session.user.email) return null;
+  if (!session?.user?.id || !session.user.role) return null;
   const current = await prisma.user.findFirst({ where: { id: session.user.id, status: "ACTIVE", archivedAt: null }, select: { id:true,role:true,email:true,firstName:true,lastName:true } });
-  if (!current?.email) return null;
-  return { userId: current.id, role: current.role, name: `${current.firstName} ${current.lastName}`, email: current.email };
+  if (!current) return null;
+  return { userId: current.id, role: current.role, name: `${current.firstName} ${current.lastName}`, email: current.email??"" };
 }
 
 export async function requireUser(): Promise<SessionUser> {

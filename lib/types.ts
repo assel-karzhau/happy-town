@@ -32,8 +32,8 @@ export interface NavItem {
 export type EntityStatus = "active" | "inactive" | "archived" | "draft" | "upcoming";
 
 export interface AdminUser { id: string; name: string; phone: string; email: string; role: "ADMIN"; createdAt: string }
-export interface Teacher { id: string; name: string; phone: string; email: string; groupIds: string[]; status: EntityStatus }
-export interface Parent { id: string; name: string; phone: string; email: string; studentIds: string[]; status: EntityStatus }
+export interface Teacher { id: string; name: string; phone: string; email: string; maskedIin?: string; groupIds: string[]; status: EntityStatus }
+export interface Parent { id: string; name: string; phone: string; email: string; maskedIin?: string; studentIds: string[]; status: EntityStatus }
 export interface AdminStudent { id: string; name: string; birthDate: string; level: string; groupId?: string; parentIds: string[]; status: EntityStatus }
 export interface ParentStudentRelation { id: string; parentId: string; studentId: string; relation: string }
 export interface AdminGroup { id: string; name: string; level: string; teacherId?: string; bookId?: string; periodId: string; capacity: number; studentIds: string[]; status: EntityStatus }

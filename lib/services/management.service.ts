@@ -10,8 +10,14 @@ import { z } from "zod";
 
 const publicUser = { id:true,email:true,phone:true,firstName:true,lastName:true,middleName:true,role:true,status:true,createdAt:true,updatedAt:true,archivedAt:true } as const;
 
+async function ensureIinAvailable(iin:string, exceptUserId?:string) {
+  const existing=await prisma.user.findUnique({where:{iin},select:{id:true}});
+  if(existing&&existing.id!==exceptUserId) throw new AppError("CONFLICT","Пользователь с таким ИИН уже существует",409);
+}
+
 export async function createUser(raw:unknown, actor:AuthenticatedActor|null) {
   const trusted=requireRole(actor,["ADMIN"]), input=createUserSchema.parse(raw);
+  await ensureIinAvailable(input.iin);
   return prisma.$transaction(async tx=>{
     const {password,...profile}=input; const passwordHash=await hash(password,12);
     const created=await tx.user.create({data:{...profile,passwordHash,teacherProfile:input.role==="TEACHER"?{create:{}}:undefined,parentProfile:input.role==="PARENT"?{create:{}}:undefined},select:publicUser});
@@ -21,6 +27,7 @@ export async function createUser(raw:unknown, actor:AuthenticatedActor|null) {
 
 export async function updateUser(userId:string, raw:unknown, actor:AuthenticatedActor|null) {
   const trusted=requireRole(actor,["ADMIN"]), input=updateUserSchema.parse(raw);
+  if(input.iin) await ensureIinAvailable(input.iin,userId);
   return prisma.$transaction(async tx=>{
     const previous=await tx.user.findFirst({where:{id:userId,archivedAt:null},select:publicUser});
     if(!previous) throw new AppError("NOT_FOUND","Пользователь не найден",404);

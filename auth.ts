@@ -4,9 +4,10 @@ import { compare } from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "./lib/db/prisma";
 import type { UserRole } from "./generated/prisma/enums";
+import { clearLoginFailures, loginAttemptAllowed, recordLoginFailure } from "./lib/auth/login-rate-limit";
 
 const credentialsSchema = z.object({
-  email: z.string().trim().toLowerCase().email(),
+  iin: z.string().transform(value=>value.replace(/\s/g,"")).pipe(z.string().regex(/^\d{12}$/)),
   password: z.string().min(1).max(200),
 });
 
@@ -17,29 +18,35 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt", maxAge: 60 * 60 * 8 },
   providers: [
     Credentials({
-      name: "Email and password",
-      credentials: { email: { type: "email" }, password: { type: "password" } },
+      name: "IIN and password",
+      credentials: { iin: { type: "text" }, password: { type: "password" } },
       async authorize(raw) {
         const parsed = credentialsSchema.safeParse(raw);
-        const email = parsed.success ? parsed.data.email : "invalid-input";
         if (!parsed.success) {
-          await recordLogin("LOGIN_FAILED", email, null, "INVALID_INPUT");
+          await recordLogin("LOGIN_FAILED", null, "INVALID_INPUT");
+          return null;
+        }
+        if(!loginAttemptAllowed(parsed.data.iin)) {
+          await recordLogin("LOGIN_FAILED", null, "RATE_LIMITED");
           return null;
         }
         const user = await prisma.user.findUnique({
-          where: { email: parsed.data.email },
+          where: { iin: parsed.data.iin },
           select: { id: true, email: true, firstName: true, lastName: true, role: true, status: true, archivedAt: true, passwordHash: true },
         });
         if (!user?.passwordHash || user.status !== "ACTIVE" || user.archivedAt) {
-          await recordLogin("LOGIN_FAILED", parsed.data.email, user?.id ?? null, "ACCOUNT_UNAVAILABLE");
+          recordLoginFailure(parsed.data.iin);
+          await recordLogin("LOGIN_FAILED", user?.id ?? null, "ACCOUNT_UNAVAILABLE");
           return null;
         }
         const valid = await compare(parsed.data.password, user.passwordHash);
         if (!valid) {
-          await recordLogin("LOGIN_FAILED", parsed.data.email, user.id, "INVALID_CREDENTIALS");
+          recordLoginFailure(parsed.data.iin);
+          await recordLogin("LOGIN_FAILED", user.id, "INVALID_CREDENTIALS");
           return null;
         }
-        await recordLogin("LOGIN", parsed.data.email, user.id, "SUCCESS");
+        clearLoginFailures(parsed.data.iin);
+        await recordLogin("LOGIN", user.id, "SUCCESS");
         return { id: user.id, email: user.email, name: `${user.firstName} ${user.lastName}`, role: user.role };
       },
     }),
@@ -56,9 +63,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
 });
 
-async function recordLogin(action: "LOGIN" | "LOGIN_FAILED", email: string, actorUserId: string | null, result: string) {
+async function recordLogin(action: "LOGIN" | "LOGIN_FAILED", actorUserId: string | null, result: string) {
   try {
-    await prisma.auditLog.create({ data: { actorUserId, action, entityType: "Authentication", entityId: actorUserId ?? email, metadata: { result, email } } });
+    await prisma.auditLog.create({ data: { actorUserId, action, entityType: "Authentication", entityId: actorUserId ?? "credentials", metadata: { result } } });
   } catch (error) {
     console.error("Unable to write authentication audit event", error instanceof Error ? error.message : "Unknown error");
   }

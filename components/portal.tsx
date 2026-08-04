@@ -35,7 +35,7 @@ const nav: Record<Role, NavItem[]> = {
   ].map(([label, icon]) => ({ label, icon, href: icon === "home" ? "/teacher" : `/teacher/${icon}` })),
   admin: [
     ["Главная", "home"], ["Учителя", "teachers"], ["Родители", "parents"], ["Ученики", "students"], ["Группы", "groups"],
-    ["Курсы", "courses"], ["Учебники", "books"], ["Разделы и темы", "units"], ["Учебные периоды", "periods"],
+    ["Курсы", "courses"], ["Учебники", "books"], ["Разделы и темы", "units"],
     ["Категории навыков", "skills"], ["История обучения", "history"], ["Архив", "archive"], ["Профиль", "profile"],
   ].map(([label, icon]) => ({ label, icon, href: icon === "home" ? "/admin" : `/admin/${icon}` })),
 };

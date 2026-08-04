@@ -20,7 +20,7 @@ npm run db:check
 npm run dev
 ```
 
-Open `http://localhost:3000`. The seed creates three deterministic development logins (ADMIN, TEACHER and PARENT); their emails and passwords are declared in `.env`. Never reuse these passwords outside local development and never commit `.env`.
+Open `http://localhost:3000`. The seed creates three deterministic development logins (ADMIN, TEACHER and PARENT); their synthetic test IINs and passwords are declared in `.env`. The defaults `000000000001`–`000000000003` are development identifiers, not real IINs. Never reuse these credentials outside local development and never commit `.env`.
 
 `/dev/database` is an ADMIN-only connection/count diagnostic in development and returns 404 in production.
 
@@ -42,11 +42,13 @@ Normal `docker compose down` and `npm run db:stop` preserve data in the `happy-t
 
 ## Authentication and authorization
 
-- Auth.js Credentials verifies email/password on the server with bcrypt hashes.
-- Sessions contain only the user id, name, email and role; raw passwords and hashes never reach the client.
+- Auth.js Credentials normalizes and verifies a 12-digit IIN/password pair on the server with bcrypt hashes. Email remains contact information and cannot be used as a login.
+- Sessions and JWTs contain only the user id, name, contact email and role; IIN, raw passwords and hashes never reach the client.
 - Protected pages validate the session and role on the server. Admin mutation routes independently require ADMIN and do not trust a client-supplied actor.
 - Parent/student and teacher/group/student reads apply server-side ownership checks and return safe 401/403/404 responses.
-- Login attempts, CRUD operations and relation changes write audit records without passwords or tokens.
+- Login attempts, CRUD operations and relation changes write audit records without IINs, passwords or tokens. Login failures use a hashed, in-memory rate-limit key.
+
+The IIN migration is intentionally staged for production safety: legacy rows may remain `NULL` until an administrator backfills verified identifiers from a trusted source. New ADMIN, TEACHER and PARENT accounts require a unique 12-digit IIN. Do not fabricate identifiers for existing users.
 - The old demo role switcher is disabled; users must sign out and authenticate as another account.
 
 ## Architecture
