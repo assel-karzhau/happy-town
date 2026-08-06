@@ -88,7 +88,7 @@ export function RoleShell({ role, user, children }: { role: Role; user: { name: 
     })}
   </nav>;
 
-  return <div className="app-shell role-layout">
+  return <div className={`app-shell role-layout ${role}-layout`}>
     <aside className="sidebar role-sidebar">
       <Link className="brand role-logo" href={`/${role}`} aria-label="Happy Town"><Logo size={84} /></Link>
       {links("desktop")}
