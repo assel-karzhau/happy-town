@@ -11,6 +11,8 @@ Happy Town is a Next.js application for managing an English school. PostgreSQL i
 ## First local run
 
 ```bash
+# Copy .env.example to .env, then fill every required local value
+# (database URLs, Auth.js secret and all SEED_* credentials) before continuing.
 cp .env.example .env
 npm install
 npm run db:start
@@ -20,7 +22,7 @@ npm run db:check
 npm run dev
 ```
 
-Open `http://localhost:3000`. The seed creates three deterministic development logins (ADMIN, TEACHER and PARENT); their synthetic test IINs and passwords are declared in `.env`. The defaults `000000000001`–`000000000003` are development identifiers, not real IINs. Never reuse these credentials outside local development and never commit `.env`.
+Open `http://localhost:3000`. The seed creates one local login for each of ADMIN, TEACHER and PARENT using only the `SEED_*` values provided in `.env`. Use synthetic development identifiers only; never reuse credentials outside local development and never commit `.env`.
 
 `/dev/database` is an ADMIN-only connection/count diagnostic in development and returns 404 in production.
 

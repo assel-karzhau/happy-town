@@ -32,7 +32,7 @@ const studentDto = (row: Prisma.StudentGetPayload<{select:typeof studentSelect}>
 const groupDto = (row: Prisma.GroupGetPayload<{select:typeof groupSelect}>): AdminGroup => ({ id:row.id,name:row.name,level:row.level,teacherId:row.teacherAssignments[0]?.teacherId,bookId:row.bookId,periodId:row.academicPeriodId,capacity:row.capacity,studentIds:row.enrollments.map(item=>item.studentId),status:status(row.status) });
 
 export async function getAdminPortalData(): Promise<AdminPortalData> {
-  const [parents,teachers,students,groups,courses,books,periods,archivedUsers,archivedStudents,archivedGroups,archivedCourses,archivedBooks,archivedUnits,archivedTopics] = await Promise.all([
+  const [parents,teachers,students,groups,courses,books,periods,archivedUsers,archivedStudents,archivedGroups,archivedCourses,archivedBooks,archivedUnits,archivedTopics,catalogCourses,catalogBooks,catalogUnits,catalogTopics,catalogSkills,history] = await Promise.all([
     prisma.user.findMany({where:{role:"PARENT",archivedAt:null},select:userSelect,orderBy:[{lastName:"asc"},{firstName:"asc"}]}),
     prisma.user.findMany({where:{role:"TEACHER",archivedAt:null},select:userSelect,orderBy:[{lastName:"asc"},{firstName:"asc"}]}),
     prisma.student.findMany({where:{archivedAt:null},select:studentSelect,orderBy:[{lastName:"asc"},{firstName:"asc"}]}),
@@ -47,6 +47,12 @@ export async function getAdminPortalData(): Promise<AdminPortalData> {
     prisma.book.findMany({where:{archivedAt:{not:null}},select:{id:true,name:true,archivedAt:true}}),
     prisma.unit.findMany({where:{archivedAt:{not:null}},select:{id:true,name:true,archivedAt:true}}),
     prisma.topic.findMany({where:{archivedAt:{not:null}},select:{id:true,name:true,archivedAt:true}}),
+    prisma.course.findMany({where:{archivedAt:null},select:{id:true,name:true,description:true,level:true,status:true,_count:{select:{books:true}}},orderBy:{name:"asc"}}),
+    prisma.book.findMany({where:{archivedAt:null},select:{id:true,name:true,author:true,publisher:true,description:true,level:true,status:true,courses:{select:{course:{select:{name:true}}}},_count:{select:{units:true}}},orderBy:{name:"asc"}}),
+    prisma.unit.findMany({where:{archivedAt:null},select:{id:true,name:true,description:true,status:true,book:{select:{name:true}},_count:{select:{topics:true}}},orderBy:[{book:{name:"asc"}},{order:"asc"}]}),
+    prisma.topic.findMany({where:{archivedAt:null},select:{id:true,name:true,description:true,status:true,unit:{select:{name:true}}},orderBy:[{unit:{name:"asc"}},{order:"asc"}]}),
+    prisma.skillCategory.findMany({where:{archivedAt:null},select:{id:true,code:true,name:true,description:true,isActive:true,_count:{select:{courseLinks:true}}},orderBy:{order:"asc"}}),
+    prisma.learningHistoryEvent.findMany({take:100,select:{id:true,eventDate:true,eventType:true,title:true,description:true,student:{select:{firstName:true,lastName:true}},actor:{select:{firstName:true,lastName:true}}},orderBy:{eventDate:"desc"}}),
   ]);
   const archived: ArchivedEntity[] = [
     ...archivedUsers.map(row=>archiveDto(row.id,row.role==="PARENT"?"parents":"teachers",row.role==="PARENT"?"Родитель":"Учитель",fullName(row),row.archivedAt)),
@@ -60,6 +66,14 @@ export async function getAdminPortalData(): Promise<AdminPortalData> {
   return {
     parents:parents.map(parentDto),teachers:teachers.map(teacherDto),students:students.map(studentDto),groups:groups.map(groupDto),archived,
     catalogs:{courses,books:books.map(row=>({id:row.id,name:row.name,courseId:row.courses[0]?.courseId})),periods},
+    catalogData:{
+      courses:catalogCourses.map(row=>({id:row.id,name:row.name,description:row.description??"",level:row.level,status:status(row.status),bookCount:row._count.books})),
+      books:catalogBooks.map(row=>({id:row.id,name:row.name,author:row.author??"",publisher:row.publisher??"",description:row.description??"",level:row.level,status:status(row.status),courseNames:row.courses.map(link=>link.course.name),unitCount:row._count.units})),
+      units:catalogUnits.map(row=>({id:row.id,name:row.name,description:row.description??"",bookName:row.book.name,status:status(row.status),topicCount:row._count.topics})),
+      topics:catalogTopics.map(row=>({id:row.id,name:row.name,description:row.description??"",unitName:row.unit.name,status:status(row.status)})),
+      skills:catalogSkills.map(row=>({id:row.id,code:row.code,name:row.name,description:row.description??"",isActive:row.isActive,courseCount:row._count.courseLinks})),
+      history:history.map(row=>({id:row.id,eventDate:row.eventDate.toISOString().slice(0,10),eventType:row.eventType,title:row.title,description:row.description??"",studentName:fullName(row.student),actorName:row.actor?fullName(row.actor):"Система"})),
+    },
   };
 }
 

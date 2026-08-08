@@ -1,5 +1,5 @@
-import { Portal } from "../../../components/portal";
-import { notFound, redirect } from "next/navigation";
+import { AdminShell } from "../../../components/admin-shell";
+import { notFound } from "next/navigation";
 import type { UserRole } from "../../../generated/prisma/enums";
 import { requirePageRole } from "../../../lib/auth/authorization";
 import { getAdminPortalData } from "../../../lib/repositories/admin.repository";
@@ -14,9 +14,10 @@ export default async function PortalPage({params}:{params:Promise<{role:string;s
   const requiredRole=roleMap[role]; if(!requiredRole) notFound();
   const path=`/${role}${slug.length?`/${slug.join("/")}`:""}`;
   const user=await requirePageRole(requiredRole,path);
-  const coreAdminPages=new Set(["home","parents","teachers","students","groups","archive"]);
+  if(slug.length>1) notFound();
   const page=slug[0]??"home";
-  if(page==="periods") redirect("/admin");
-  const adminData=requiredRole==="ADMIN"&&coreAdminPages.has(page)?await getAdminPortalData():undefined;
-  return <Portal user={{name:user.name,email:user.email}} adminData={adminData}/>;
+  const adminPages=new Set(["home","parents","teachers","students","groups","courses","books","units","topics","skills","history","archive","profile"]);
+  if(!adminPages.has(page)) notFound();
+  const adminData=await getAdminPortalData();
+  return <AdminShell page={page as Parameters<typeof AdminShell>[0]["page"]} user={{name:user.name,email:user.email}} data={adminData}/>;
 }

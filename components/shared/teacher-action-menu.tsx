@@ -29,6 +29,7 @@ export function TeacherActionMenu({ kind, item }: { kind: Kind; item: Item }) {
   const root = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [confirmingArchive, setConfirmingArchive] = useState(false);
   const [title, setTitle] = useState(item.title);
   const [secondary, setSecondary] = useState(item.secondary ?? "");
   const [busy, setBusy] = useState(false);
@@ -56,6 +57,7 @@ export function TeacherActionMenu({ kind, item }: { kind: Kind; item: Item }) {
       if (!response.ok) throw new Error(result.error || "Не удалось выполнить действие");
       setOpen(false);
       setEditing(false);
+      setConfirmingArchive(false);
       setMessage(action === config.archive ? "Запись перенесена в архив" : "Изменения сохранены");
       router.refresh();
     } catch (error) {
@@ -76,9 +78,7 @@ export function TeacherActionMenu({ kind, item }: { kind: Kind; item: Item }) {
     </button>
     {open && <div className="record-action-popover" role="menu">
       <button type="button" role="menuitem" onClick={() => { setEditing(true); setOpen(false); }}><Pencil size={16} />Редактировать</button>
-      <button type="button" role="menuitem" className="destructive" disabled={busy} onClick={() => {
-        if (window.confirm(`Переместить «${item.title}» в архив?`)) void run(config.archive);
-      }}>{busy ? <Loader2 className="spin" size={16} /> : <Archive size={16} />}В архив</button>
+      <button type="button" role="menuitem" className="destructive" disabled={busy} onClick={() => { setConfirmingArchive(true); setOpen(false); }}>{busy ? <Loader2 className="spin" size={16} /> : <Archive size={16} />}В архив</button>
     </div>}
     {editing && <div className="dialog-layer" onMouseDown={(event) => event.target === event.currentTarget && !busy && setEditing(false)}>
       <form className="record-edit-dialog section-card" onSubmit={save} aria-label={`Редактирование: ${item.title}`}>
@@ -87,6 +87,13 @@ export function TeacherActionMenu({ kind, item }: { kind: Kind; item: Item }) {
         {kind === "word" && <label><span>Перевод</span><input value={secondary} onChange={(event) => setSecondary(event.target.value)} required /></label>}
         <footer><button className="btn secondary" type="button" onClick={() => setEditing(false)} disabled={busy}>Отмена</button><button className="btn" disabled={busy}>{busy ? <Loader2 className="spin" /> : <Check size={17} />}Сохранить</button></footer>
       </form>
+    </div>}
+    {confirmingArchive && <div className="dialog-layer" onMouseDown={(event) => event.target === event.currentTarget && !busy && setConfirmingArchive(false)}>
+      <section className="record-edit-dialog section-card" role="dialog" aria-modal="true" aria-labelledby={`archive-${item.id}`}>
+        <header><div><span className="eyebrow">Happy Town</span><h2 id={`archive-${item.id}`}>Переместить в архив?</h2></div><button className="icon-btn" type="button" aria-label="Закрыть" onClick={() => setConfirmingArchive(false)}><X size={18} /></button></header>
+        <p>Запись «{item.title}» будет скрыта из активного списка. История сохранится.</p>
+        <footer><button className="btn secondary" type="button" onClick={() => setConfirmingArchive(false)} disabled={busy}>Отмена</button><button className="btn danger-btn" type="button" disabled={busy} onClick={() => void run(config.archive)}>{busy ? <Loader2 className="spin" /> : <Archive size={17} />}Архивировать</button></footer>
+      </section>
     </div>}
     {message && <span className="record-action-message" role="status">{message}</span>}
   </div>;

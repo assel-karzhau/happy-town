@@ -11,19 +11,27 @@ if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required");
 const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }) });
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const date = (value: string) => new Date(`${value}T00:00:00.000Z`);
+const requiredSeedValue = (name: string) => {
+  const value = process.env[name]?.trim();
+  if (!value) throw new Error(`${name} is required for local seeding`);
+  return value;
+};
 
 async function main() {
-  const adminEmail = process.env.SEED_ADMIN_EMAIL ?? "admin@happytown.local";
-  const teacherEmail = process.env.SEED_TEACHER_EMAIL ?? "teacher@happytown.local";
-  const parentEmail = process.env.SEED_PARENT_EMAIL ?? "parent@happytown.local";
-  const adminIin = process.env.SEED_ADMIN_IIN ?? "000000000001";
-  const teacherIin = process.env.SEED_TEACHER_IIN ?? "000000000002";
-  const parentIin = process.env.SEED_PARENT_IIN ?? "000000000003";
+  const adminEmail = requiredSeedValue("SEED_ADMIN_EMAIL");
+  const teacherEmail = requiredSeedValue("SEED_TEACHER_EMAIL");
+  const parentEmail = requiredSeedValue("SEED_PARENT_EMAIL");
+  const adminIin = requiredSeedValue("SEED_ADMIN_IIN");
+  const teacherIin = requiredSeedValue("SEED_TEACHER_IIN");
+  const parentIin = requiredSeedValue("SEED_PARENT_IIN");
+  const adminPassword = requiredSeedValue("SEED_ADMIN_PASSWORD");
+  const teacherPassword = requiredSeedValue("SEED_TEACHER_PASSWORD");
+  const parentPassword = requiredSeedValue("SEED_PARENT_PASSWORD");
   if(![adminIin,teacherIin,parentIin].every(value=>/^\d{12}$/.test(value))||new Set([adminIin,teacherIin,parentIin]).size!==3) throw new Error("Seed IIN values must be unique 12-digit development identifiers");
   const [adminPasswordHash, teacherPasswordHash, parentPasswordHash] = await Promise.all([
-    hash(process.env.SEED_ADMIN_PASSWORD ?? "HappyTown-Admin-2026!", 12),
-    hash(process.env.SEED_TEACHER_PASSWORD ?? "HappyTown-Teacher-2026!", 12),
-    hash(process.env.SEED_PARENT_PASSWORD ?? "HappyTown-Parent-2026!", 12),
+    hash(adminPassword, 12),
+    hash(teacherPassword, 12),
+    hash(parentPassword, 12),
   ]);
   const adminId = id(1);
   await prisma.user.upsert({

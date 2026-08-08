@@ -18,25 +18,26 @@ test("login form accepts only twelve digits and uses a generic error",()=>{
   assert.match(login,/inputMode="numeric"/);
   assert.match(login,/maxLength=\{12\}/);
   assert.match(login,/replace\(\/\\D\/g,""\)/);
-  assert.match(login,/Неверный ИИН или пароль/);
-  assert.doesNotMatch(login,/type="email"|Неверный email или пароль/);
+  assert.match(login,/\u041d\u0435\u0432\u0435\u0440\u043d\u044b\u0439 \u0418\u0418\u041d \u0438\u043b\u0438 \u043f\u0430\u0440\u043e\u043b\u044c/);
+  assert.doesNotMatch(login,/type="email"|\u041d\u0435\u0432\u0435\u0440\u043d\u044b\u0439 email \u0438\u043b\u0438 \u043f\u0430\u0440\u043e\u043b\u044c/);
 });
 
-test("IIN migration preserves AcademicPeriod and admin UI hides its route",()=>{
+test("IIN migration preserves AcademicPeriod and admin navigation has no periods route",()=>{
   const migration=read("prisma/migrations/20260805000000_user_iin_login/migration.sql");
   const schema=read("prisma/schema.prisma");
-  const portal=read("components/portal.tsx");
+  const shell=read("components/admin-shell.tsx");
   const route=read("app/[role]/[[...slug]]/page.tsx");
   assert.match(migration,/ADD COLUMN "iin" VARCHAR\(12\)/);
   assert.match(migration,/CREATE UNIQUE INDEX "users_iin_key"/);
   assert.match(schema,/model AcademicPeriod \{/);
-  assert.doesNotMatch(portal,/\["Учебные периоды",\s*"periods"\]/);
-  assert.match(route,/page==="periods"\) redirect\("\/admin"\)/);
+  assert.doesNotMatch(shell,/periods/);
+  assert.match(route,/if\(!adminPages\.has\(page\)\) notFound\(\)/);
 });
 
 test("parent UI receives only a masked IIN",()=>{
   const repository=read("lib/repositories/parent-pages.repository.ts");
   const page=read("components/parent-pages.tsx");
   assert.match(repository,/maskedIin:parent\.iin\?`\*\*\*\*\*\*\*\*\$\{parent\.iin\.slice\(-4\)\}`/);
-  assert.match(page,/<dt>ИИН<\/dt><dd>\{data\.parent\.maskedIin\}<\/dd>/);
+  assert.match(page,/data\.parent\.maskedIin/);
+  assert.doesNotMatch(page,/data\.parent\.iin/);
 });
