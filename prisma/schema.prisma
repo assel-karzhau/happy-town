@@ -707,6 +707,7 @@ model MonthlyAssessment {
 
   @@unique([studentId, year, month, groupId])
   @@index([groupId, year, month])
+  @@index([studentId, status, year, month])
   @@map("monthly_assessments")
 }
 
@@ -750,6 +751,7 @@ model TeacherReview {
 
   @@unique([studentId, groupId, year, month])
   @@index([status, publishedAt])
+  @@index([studentId, status, year, month])
   @@map("teacher_reviews")
 }
 

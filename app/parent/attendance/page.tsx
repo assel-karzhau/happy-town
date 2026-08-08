@@ -1,2 +1,5 @@
-import { requireParent } from "../../../lib/auth/authorization";import { getParentChildAttendance } from "../../../lib/repositories/parent-pages.repository";import { ParentAttendancePage } from "../../../components/parent-pages";
-export const dynamic="force-dynamic";export const revalidate=0;export default async function Page({searchParams}:{searchParams:Promise<{child?:string}>}){const user=await requireParent(),{child}=await searchParams;return <ParentAttendancePage data={await getParentChildAttendance(user.userId,child)}/>}
+import { requireParent } from "../../../lib/auth/authorization";
+import { getParentAttendanceAnalytics } from "../../../lib/repositories/parent-pages.repository";
+import { ParentAttendanceAnalyticsPage } from "../../../components/parent-analytics-pages";
+export const dynamic="force-dynamic";export const revalidate=0;
+export default async function Page({searchParams}:{searchParams:Promise<{child?:string;period?:string}>}){const user=await requireParent(),params=await searchParams;return <ParentAttendanceAnalyticsPage data={await getParentAttendanceAnalytics(user.userId,params.child,params.period)}/>}

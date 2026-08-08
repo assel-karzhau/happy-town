@@ -3,7 +3,7 @@ import { readFile, stat } from "node:fs/promises";
 import test from "node:test";
 
 const teacher={"":"getTeacherDashboard","groups":"getTeacherGroups","students":"getTeacherStudents","attendance":"getTeacherAttendance","lessons":"getTeacherLessons","homework":"getTeacherHomework","words":"getTeacherWords","tests":"getTeacherTests","assessments":"getTeacherAssessments","reviews":"getTeacherReviews","profile":"getTeacherProfile"};
-const parent={"":"getParentDashboard","topics":"getParentChildTopics","words":"getParentChildWords","homework":"getParentChildHomework","attendance":"getParentChildAttendance","tests":"getParentChildTests","progress":"getParentChildProgress","reviews":"getParentChildReviews","history":"getParentChildHistory","profile":"getParentProfile"};
+const parent={"":"getParentDashboard","topics":"getParentChildTopics","words":"getParentWordsAnalytics","homework":"getParentChildHomework","attendance":"getParentAttendanceAnalytics","tests":"getParentTestsAnalytics","progress":"getParentProgressAnalytics","reviews":"getParentReviewsAnalytics","history":"getParentHistoryAnalytics","profile":"getParentProfile"};
 const root=new URL("../app/",import.meta.url);
 
 for(const [role,routes] of Object.entries({teacher,parent}))for(const [route,query] of Object.entries(routes))test(`${role}/${route||"dashboard"} has an independent server page`,async()=>{const url=new URL(`${role}/${route?`${route}/`:""}page.tsx`,root);await stat(url);const source=await readFile(url,"utf8");assert.match(source,new RegExp(`\\b${query}\\b`));assert.match(source,/require(Teacher|Parent)\(\)/);assert.match(source,/force-dynamic/);assert.doesNotMatch(source,/mock-data|mockData|TeacherDatabasePortal|ParentDatabasePortal/)});

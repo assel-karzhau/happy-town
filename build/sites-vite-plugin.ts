@@ -21,6 +21,19 @@ export function sites(): Plugin {
   return {
     name: "sites",
     apply: "build",
+    transform(code, id) {
+      // Prisma's generated client assigns __dirname from import.meta.url. The
+      // Sites worker wrapper does not expose import.meta.url at runtime, while
+      // the client-engine build already bundles its WASM imports. Keep the
+      // compatibility global without evaluating an unavailable URL.
+      if (id.endsWith("/generated/prisma/client.ts")) {
+        return code.replace(
+          /globalThis\[['"]__dirname['"]\]\s*=\s*(?:path\.)?dirname\(fileURLToPath\(import\.meta\.url\)\)\s*;?/,
+          'globalThis["__dirname"] = "."',
+        );
+      }
+      return null;
+    },
     configResolved(config) {
       root = config.root;
     },

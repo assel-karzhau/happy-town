@@ -23,6 +23,10 @@ export async function saveMonthlyAssessment(raw:unknown, actor:AuthenticatedActo
   return prisma.$transaction(async tx=>{
     requireOwnTeacherIdentity(trusted,input.teacherId);
     await requireTeacherGroupAccess(tx,trusted,input.groupId);
+    const group=await tx.group.findFirst({where:{id:input.groupId,archivedAt:null,academicPeriodId:input.academicPeriodId},select:{course:{select:{skillCategories:{where:{skillCategory:{isActive:true,archivedAt:null}},select:{skillCategoryId:true}}}},enrollments:{where:{studentId:input.studentId,status:"ACTIVE",endedAt:null},select:{id:true}}}});
+    if(!group?.enrollments.length)throw new AppError("BUSINESS_RULE_VIOLATION","Ученик не состоит в выбранной группе",409);
+    const allowed=new Set(group.course.skillCategories.map(item=>item.skillCategoryId));
+    if(input.scores.some(score=>!allowed.has(score.skillCategoryId)))throw new AppError("BUSINESS_RULE_VIOLATION","Навык не относится к программе группы",409);
     const assessment=await tx.monthlyAssessment.upsert({where:{studentId_year_month_groupId:{studentId:input.studentId,year:input.year,month:input.month,groupId:input.groupId}},create:{studentId:input.studentId,groupId:input.groupId,teacherId:input.teacherId,academicPeriodId:input.academicPeriodId,year:input.year,month:input.month},update:{teacherId:input.teacherId,academicPeriodId:input.academicPeriodId,status:"DRAFT",publishedAt:null},select:{id:true,studentId:true,groupId:true,year:true,month:true,status:true}});
     for(const score of input.scores) await tx.monthlySkillScore.upsert({where:{assessmentId_skillCategoryId:{assessmentId:assessment.id,skillCategoryId:score.skillCategoryId}},create:{assessmentId:assessment.id,...score},update:{score:score.score,teacherComment:score.teacherComment}});
     await writeAuditLog(tx,{actorUserId:trusted.userId,action:"UPDATE",entityType:"MonthlyAssessment",entityId:assessment.id,newData:{...assessment,scoreCount:input.scores.length}}); return assessment;
@@ -34,6 +38,8 @@ export async function saveTeacherReview(raw:unknown, actor:AuthenticatedActor|nu
   return prisma.$transaction(async tx=>{
     requireOwnTeacherIdentity(trusted,input.teacherId);
     await requireTeacherGroupAccess(tx,trusted,input.groupId);
+    const enrollment=await tx.studentGroupEnrollment.findFirst({where:{studentId:input.studentId,groupId:input.groupId,status:"ACTIVE",endedAt:null},select:{id:true}});
+    if(!enrollment)throw new AppError("BUSINESS_RULE_VIOLATION","Ученик не состоит в выбранной группе",409);
     const review=await tx.teacherReview.upsert({where:{studentId_groupId_year_month:{studentId:input.studentId,groupId:input.groupId,year:input.year,month:input.month}},create:input,update:{...input,status:"DRAFT",publishedAt:null,archivedAt:null},select:{id:true,studentId:true,groupId:true,year:true,month:true,progressLevel:true,status:true}});
     await writeAuditLog(tx,{actorUserId:trusted.userId,action:"UPDATE",entityType:"TeacherReview",entityId:review.id,newData:review}); return review;
   });
@@ -42,10 +48,13 @@ export async function saveTeacherReview(raw:unknown, actor:AuthenticatedActor|nu
 export async function publishMonthlyAssessment(assessmentId:string, actor:AuthenticatedActor|null) {
   const trusted=requireRole(actor,["ADMIN","TEACHER"]);
   return prisma.$transaction(async tx=>{
-    const assessment=await tx.monthlyAssessment.findUnique({where:{id:assessmentId},select:{id:true,studentId:true,groupId:true,status:true,skillScores:{select:{id:true}}}});
+    const assessment=await tx.monthlyAssessment.findUnique({where:{id:assessmentId},select:{id:true,studentId:true,groupId:true,status:true,skillScores:{select:{skillCategoryId:true,score:true}},group:{select:{course:{select:{skillCategories:{where:{skillCategory:{isActive:true,archivedAt:null}},select:{skillCategoryId:true}}}},enrollments:{where:{status:"ACTIVE",endedAt:null},select:{studentId:true}}}}}});
     if(!assessment) throw new AppError("NOT_FOUND","Оценка не найдена",404);
     await requireTeacherGroupAccess(tx,trusted,assessment.groupId);
-    if(!assessment.skillScores.length) throw new AppError("BUSINESS_RULE_VIOLATION","Добавьте хотя бы одну оценку навыка",409);
+    const expected=new Set(assessment.group.course.skillCategories.map(item=>item.skillCategoryId));
+    const received=new Set(assessment.skillScores.filter(item=>item.score>=1&&item.score<=10).map(item=>item.skillCategoryId));
+    if(!assessment.group.enrollments.some(item=>item.studentId===assessment.studentId))throw new AppError("BUSINESS_RULE_VIOLATION","Ученик больше не состоит в группе",409);
+    if(!expected.size||expected.size!==received.size||[...expected].some(id=>!received.has(id)))throw new AppError("BUSINESS_RULE_VIOLATION","Заполните все обязательные навыки баллами от 1 до 10",409);
     const publishedAt=new Date();
     const published=await tx.monthlyAssessment.update({where:{id:assessmentId},data:{status:"PUBLISHED",publishedAt},select:{id:true,status:true,publishedAt:true}});
     await writeAuditLog(tx,{actorUserId:trusted.userId,action:"PUBLISH",entityType:"MonthlyAssessment",entityId:assessmentId,previousData:{status:assessment.status},newData:published});
@@ -62,7 +71,10 @@ export async function publishTeacherReview(reviewId:string, actor:AuthenticatedA
     if(![review.achievements,review.improvements,review.recommendations,review.generalComment].some(value=>value?.trim())) throw new AppError("BUSINESS_RULE_VIOLATION","Нельзя публиковать пустой отзыв",409);
     const publishedAt=new Date();
     const published=await tx.teacherReview.update({where:{id:reviewId},data:{status:"PUBLISHED",publishedAt},select:{id:true,status:true,publishedAt:true}});
-    await tx.learningHistoryEvent.create({data:{studentId:review.studentId,eventType:"REVIEW_PUBLISHED",eventDate:publishedAt,actorUserId:trusted.userId,groupId:review.groupId,title:"Опубликован ежемесячный отзыв"}});
+    const eventFrom=new Date(Date.UTC(publishedAt.getUTCFullYear(),publishedAt.getUTCMonth(),1)),eventTo=new Date(Date.UTC(publishedAt.getUTCFullYear(),publishedAt.getUTCMonth()+1,1));
+    const existingEvent=await tx.learningHistoryEvent.findFirst({where:{studentId:review.studentId,eventType:"REVIEW_PUBLISHED",groupId:review.groupId,eventDate:{gte:eventFrom,lt:eventTo}},select:{id:true}});
+    if(existingEvent)await tx.learningHistoryEvent.update({where:{id:existingEvent.id},data:{eventDate:publishedAt,actorUserId:trusted.userId,title:"Опубликован ежемесячный отзыв"}});
+    else await tx.learningHistoryEvent.create({data:{studentId:review.studentId,eventType:"REVIEW_PUBLISHED",eventDate:publishedAt,actorUserId:trusted.userId,groupId:review.groupId,title:"Опубликован ежемесячный отзыв"}});
     await writeAuditLog(tx,{actorUserId:trusted.userId,action:"PUBLISH",entityType:"TeacherReview",entityId:reviewId,previousData:{status:review.status},newData:published});
     return published;
   });

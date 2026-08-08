@@ -98,13 +98,14 @@ export async function getTeacherTests(userId:string){
 }
 
 export async function getTeacherAssessments(userId:string){
-  const groups=await getTeacherGroups(userId),groupIds=groups.map(item=>item.id);
-  const [skills,items]=await Promise.all([prisma.skillCategory.findMany({where:{isActive:true,archivedAt:null},orderBy:{order:"asc"},select:{id:true,name:true}}),prisma.monthlyAssessment.findMany({where:{teacherId:userId,groupId:{in:groupIds}},orderBy:[{year:"desc"},{month:"desc"}],select:{id:true,studentId:true,groupId:true,year:true,month:true,status:true,publishedAt:true,student:{select:{firstName:true,lastName:true}},group:{select:{name:true,academicPeriodId:true}},skillScores:{select:{skillCategoryId:true,score:true,teacherComment:true}}}})]);
-  return {groups,skills,items:items.map(row=>({...row,publishedAt:row.publishedAt?.toISOString()??null,student:{...row.student,name:fullName(row.student)}}))};
+  const groups=await prisma.group.findMany({where:{archivedAt:null,teacherAssignments:{some:{teacherId:userId,isCurrent:true,endedAt:null}}},orderBy:{name:"asc"},select:{id:true,name:true,academicPeriod:{select:{id:true,name:true}},course:{select:{skillCategories:{orderBy:{order:"asc"},where:{skillCategory:{isActive:true,archivedAt:null}},select:{skillCategory:{select:{id:true,name:true}}}}}},enrollments:{where:{status:"ACTIVE",endedAt:null},orderBy:{student:{lastName:"asc"}},select:{student:{select:{id:true,firstName:true,lastName:true}}}}}});
+  const groupIds=groups.map(item=>item.id),items=await prisma.monthlyAssessment.findMany({where:{teacherId:userId,groupId:{in:groupIds}},orderBy:[{year:"desc"},{month:"desc"}],select:{id:true,studentId:true,groupId:true,year:true,month:true,status:true,publishedAt:true,student:{select:{firstName:true,lastName:true}},group:{select:{name:true,academicPeriodId:true}},skillScores:{select:{skillCategoryId:true,score:true,teacherComment:true}}}});
+  const mappedGroups=groups.map(group=>({id:group.id,name:group.name,academicPeriod:group.academicPeriod,skills:group.course.skillCategories.map(item=>item.skillCategory),students:group.enrollments.map(item=>({...item.student,name:fullName(item.student)}))}));
+  return {groups:mappedGroups,skills:[...new Map(mappedGroups.flatMap(group=>group.skills).map(skill=>[skill.id,skill])).values()],items:items.map(row=>({...row,publishedAt:row.publishedAt?.toISOString()??null,student:{...row.student,name:fullName(row.student)}}))};
 }
 
 export async function getTeacherReviews(userId:string){
-  const groups=await getTeacherGroups(userId),groupIds=groups.map(item=>item.id);
+  const assessmentData=await getTeacherAssessments(userId),groups=assessmentData.groups,groupIds=groups.map(item=>item.id);
   const items=await prisma.teacherReview.findMany({where:{teacherId:userId,groupId:{in:groupIds},archivedAt:null},orderBy:[{year:"desc"},{month:"desc"}],select:{id:true,studentId:true,groupId:true,year:true,month:true,status:true,publishedAt:true,achievements:true,improvements:true,recommendations:true,generalComment:true,progressLevel:true,student:{select:{firstName:true,lastName:true}},group:{select:{name:true}}}});
   return {groups,items:items.map(row=>({...row,publishedAt:row.publishedAt?.toISOString()??null,student:{...row.student,name:fullName(row.student)}}))};
 }
