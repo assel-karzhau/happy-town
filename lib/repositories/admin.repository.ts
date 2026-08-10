@@ -49,7 +49,7 @@ export async function getAdminPortalData(): Promise<AdminPortalData> {
     prisma.topic.findMany({where:{archivedAt:{not:null}},select:{id:true,name:true,archivedAt:true}}),
     prisma.course.findMany({where:{archivedAt:null},select:{id:true,name:true,description:true,level:true,status:true,_count:{select:{books:true}}},orderBy:{name:"asc"}}),
     prisma.book.findMany({where:{archivedAt:null},select:{id:true,name:true,author:true,publisher:true,description:true,level:true,status:true,courses:{select:{course:{select:{name:true}}}},_count:{select:{units:true}}},orderBy:{name:"asc"}}),
-    prisma.unit.findMany({where:{archivedAt:null},select:{id:true,name:true,description:true,status:true,book:{select:{name:true}},_count:{select:{topics:true}}},orderBy:[{book:{name:"asc"}},{order:"asc"}]}),
+    prisma.unit.findMany({where:{archivedAt:null},select:{id:true,bookId:true,name:true,description:true,status:true,book:{select:{name:true}},_count:{select:{topics:true}}},orderBy:[{book:{name:"asc"}},{order:"asc"}]}),
     prisma.topic.findMany({where:{archivedAt:null},select:{id:true,name:true,description:true,status:true,unit:{select:{name:true}}},orderBy:[{unit:{name:"asc"}},{order:"asc"}]}),
     prisma.skillCategory.findMany({where:{archivedAt:null},select:{id:true,code:true,name:true,description:true,isActive:true,_count:{select:{courseLinks:true}}},orderBy:{order:"asc"}}),
     prisma.learningHistoryEvent.findMany({take:100,select:{id:true,eventDate:true,eventType:true,title:true,description:true,student:{select:{firstName:true,lastName:true}},actor:{select:{firstName:true,lastName:true}}},orderBy:{eventDate:"desc"}}),
@@ -69,7 +69,7 @@ export async function getAdminPortalData(): Promise<AdminPortalData> {
     catalogData:{
       courses:catalogCourses.map(row=>({id:row.id,name:row.name,description:row.description??"",level:row.level,status:status(row.status),bookCount:row._count.books})),
       books:catalogBooks.map(row=>({id:row.id,name:row.name,author:row.author??"",publisher:row.publisher??"",description:row.description??"",level:row.level,status:status(row.status),courseNames:row.courses.map(link=>link.course.name),unitCount:row._count.units})),
-      units:catalogUnits.map(row=>({id:row.id,name:row.name,description:row.description??"",bookName:row.book.name,status:status(row.status),topicCount:row._count.topics})),
+      units:catalogUnits.map(row=>({id:row.id,bookId:row.bookId,name:row.name,description:row.description??"",bookName:row.book.name,status:status(row.status),topicCount:row._count.topics})),
       topics:catalogTopics.map(row=>({id:row.id,name:row.name,description:row.description??"",unitName:row.unit.name,status:status(row.status)})),
       skills:catalogSkills.map(row=>({id:row.id,code:row.code,name:row.name,description:row.description??"",isActive:row.isActive,courseCount:row._count.courseLinks})),
       history:history.map(row=>({id:row.id,eventDate:row.eventDate.toISOString().slice(0,10),eventType:row.eventType,title:row.title,description:row.description??"",studentName:fullName(row.student),actorName:row.actor?fullName(row.actor):"Система"})),

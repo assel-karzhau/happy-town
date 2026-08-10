@@ -4,9 +4,9 @@ Happy Town is a Next.js application for managing an English school. PostgreSQL i
 
 ## Requirements
 
-- Node.js 22.13+
+- Node.js 24.16.0 (pinned in `.nvmrc` and `.node-version`)
 - Docker Desktop with Docker Compose v2
-- npm
+- npm 11.13.0
 
 ## First local run
 
@@ -14,7 +14,8 @@ Happy Town is a Next.js application for managing an English school. PostgreSQL i
 # Copy .env.example to .env, then fill every required local value
 # (database URLs, Auth.js secret and all SEED_* credentials) before continuing.
 cp .env.example .env
-npm install
+nvm use
+npm ci
 npm run db:start
 npm run db:migrate
 npm run db:seed
@@ -23,6 +24,8 @@ npm run dev
 ```
 
 Open `http://localhost:3000`. The seed creates one local login for each of ADMIN, TEACHER and PARENT using only the `SEED_*` values provided in `.env`. Use synthetic development identifiers only; never reuse credentials outside local development and never commit `.env`.
+
+Always commit `package-lock.json` and use `npm ci` after cloning or pulling. The project bundles its own Inter font, pins the Node/npm toolchain and normalizes mobile viewport behavior, so text metrics and responsive breakpoints do not depend on the operating system. GitHub Actions verifies linting, types, tests and the production build on every push and pull request.
 
 `/dev/database` is an ADMIN-only connection/count diagnostic in development and returns 404 in production.
 

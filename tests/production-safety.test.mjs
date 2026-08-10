@@ -31,7 +31,8 @@ test("production admin routes use explicit real-data mapping without legacy mock
     read("components/admin-shell.tsx"),
     read("lib/repositories/admin.repository.ts"),
   ]);
-  for (const page of ["courses", "books", "units", "topics", "skills", "history", "profile"]) assert.match(route, new RegExp(`\"${page}\"`));
+  for (const page of ["books", "units", "topics", "skills", "history", "profile"]) assert.match(route, new RegExp(`\"${page}\"`));
+  assert.doesNotMatch(route, /"courses"/);
   assert.match(route, /if\(!adminPages\.has\(page\)\) notFound\(\)/);
   assert.doesNotMatch(route, /from "[^\"]*admin-portal";|mock-data/);
   assert.doesNotMatch(shell, /from "\.\/admin-portal";|mock-data/);

@@ -36,7 +36,8 @@ test("batch roster changes enforce capacity and preserve transfer history", asyn
 test("admin mobile navigation contains only explicit production pages and safe logout", async () => {
   const shell = await read("components/admin-shell.tsx");
   assert.match(shell, /const navigation:Array/);
-  for (const page of ["courses", "books", "units", "skills", "history", "profile"]) assert.match(shell, new RegExp(`page:\\"${page}\\"`));
+  for (const page of ["books", "units", "skills", "history", "profile"]) assert.match(shell, new RegExp(`page:\\"${page}\\"`));
+  assert.doesNotMatch(shell, /page:"courses"|label:"Курсы"/);
   assert.match(shell, /signOut\(\{callbackUrl:\"\/login\"\}\)/);
   assert.doesNotMatch(shell, /mock-data|from "\.\/admin-portal";/);
 });
