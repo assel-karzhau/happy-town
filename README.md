@@ -25,7 +25,7 @@ npm run dev
 
 Open `http://localhost:3000`. The seed creates one local login for each of ADMIN, TEACHER and PARENT using only the `SEED_*` values provided in `.env`. Use synthetic development identifiers only; never reuse credentials outside local development and never commit `.env`.
 
-Always commit `package-lock.json` and use `npm ci` after cloning or pulling. The project bundles its own Inter font, pins the Node/npm toolchain and normalizes mobile viewport behavior, so text metrics and responsive breakpoints do not depend on the operating system. GitHub Actions verifies linting, types, tests and the production build on every push and pull request.
+Always commit `package-lock.json` and use `npm ci` after cloning or pulling. Installation generates the Prisma Client into `generated/prisma` automatically; that generated directory is intentionally not committed. The project bundles its own Inter font, pins the Node/npm toolchain and normalizes mobile viewport behavior, so text metrics and responsive breakpoints do not depend on the operating system. GitHub Actions also runs an explicit Prisma generation step before linting, typechecking, tests and the production build on every push and pull request.
 
 `/dev/database` is an ADMIN-only connection/count diagnostic in development and returns 404 in production.
 

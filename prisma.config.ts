@@ -1,5 +1,7 @@
 import "dotenv/config";
-import { defineConfig, env } from "prisma/config";
+import { defineConfig } from "prisma/config";
+
+const databaseUrl = process.env.DIRECT_URL || process.env.DATABASE_URL;
 
 export default defineConfig({
   schema: "prisma/schema.prisma",
@@ -7,9 +9,8 @@ export default defineConfig({
     path: "prisma/migrations",
     seed: "tsx prisma/seed.ts",
   },
-  datasource: {
-    // Runtime traffic may use a provider's pooled URL, while migrations should
-    // prefer the direct connection when one is supplied (for example, Neon).
-    url: process.env.DIRECT_URL || env("DATABASE_URL"),
-  },
+  // Client generation and static checks do not need a live database URL.
+  // Migration and introspection commands still receive the configured URL
+  // whenever DIRECT_URL or DATABASE_URL is present.
+  ...(databaseUrl ? { datasource: { url: databaseUrl } } : {}),
 });
