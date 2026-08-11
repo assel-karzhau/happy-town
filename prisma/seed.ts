@@ -3,21 +3,153 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../generated/prisma/client";
 import { hash } from "bcryptjs";
 
-if (process.env.NODE_ENV === "production" && process.env.ALLOW_PRODUCTION_SEED !== "true") {
-  throw new Error("Production seeding is disabled. Set ALLOW_PRODUCTION_SEED=true explicitly.");
-}
-if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required");
+const CONNECTION_TIMEOUT_MS = 10_000;
+const QUERY_TIMEOUT_MS = 15_000;
+const OPERATION_TIMEOUT_MS = 20_000;
 
-const prisma = new PrismaClient({ adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }) });
+type ProductionSeedConfig = {
+  databaseUrl: string;
+  adminIin: string;
+  adminPassword: string;
+  adminFirstName: string;
+  adminLastName: string;
+};
+
+let prisma: PrismaClient | undefined;
+
 const id = (n: number) => `00000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
 const date = (value: string) => new Date(`${value}T00:00:00.000Z`);
-const requiredSeedValue = (name: string) => {
+const requiredSeedValue = (name: string, context = "local seeding") => {
   const value = process.env[name]?.trim();
-  if (!value) throw new Error(`${name} is required for local seeding`);
+  if (!value) throw new Error(`${name} is required for ${context}`);
   return value;
 };
 
-async function main() {
+function createPrismaClient(databaseUrl: string) {
+  return new PrismaClient({
+    adapter: new PrismaPg({
+      connectionString: databaseUrl,
+      connectionTimeoutMillis: CONNECTION_TIMEOUT_MS,
+      statement_timeout: QUERY_TIMEOUT_MS,
+      query_timeout: QUERY_TIMEOUT_MS,
+      idleTimeoutMillis: 5_000,
+      allowExitOnIdle: true,
+      max: 4,
+    }),
+  });
+}
+
+async function withTimeout<T>(operation: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<T>((_resolve, reject) => {
+        timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+        timer.unref?.();
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+function validateProductionEnvironment(): ProductionSeedConfig {
+  if (process.env.ALLOW_PRODUCTION_SEED !== "true") {
+    throw new Error("Production bootstrap is disabled. Set ALLOW_PRODUCTION_SEED=true explicitly.");
+  }
+
+  const pooledDatabaseUrl = requiredSeedValue("DATABASE_URL", "production bootstrap");
+  const directDatabaseUrl = process.env.DIRECT_URL?.trim();
+  for (const databaseUrl of [pooledDatabaseUrl, directDatabaseUrl].filter((value): value is string => Boolean(value))) {
+    let hostname: string;
+    try {
+      hostname = new URL(databaseUrl).hostname.toLowerCase();
+    } catch {
+      throw new Error("A production database URL is invalid");
+    }
+    if (hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1") {
+      throw new Error("Production bootstrap refuses to use a localhost database");
+    }
+  }
+  const databaseUrl = directDatabaseUrl || pooledDatabaseUrl;
+
+  const adminIin = requiredSeedValue("SEED_ADMIN_IIN", "production bootstrap");
+  const adminPassword = requiredSeedValue("SEED_ADMIN_PASSWORD", "production bootstrap");
+  const adminFirstName = requiredSeedValue("SEED_ADMIN_FIRST_NAME", "production bootstrap");
+  const adminLastName = requiredSeedValue("SEED_ADMIN_LAST_NAME", "production bootstrap");
+
+  if (!/^\d{12}$/.test(adminIin)) throw new Error("SEED_ADMIN_IIN must contain exactly 12 digits");
+  if (adminPassword.length < 10 || adminPassword.length > 200) {
+    throw new Error("SEED_ADMIN_PASSWORD must contain between 10 and 200 characters");
+  }
+  if (adminFirstName.length > 100 || adminLastName.length > 100) {
+    throw new Error("Admin first and last names must not exceed 100 characters");
+  }
+
+  return { databaseUrl, adminIin, adminPassword, adminFirstName, adminLastName };
+}
+
+async function seedProductionAdmin(client: PrismaClient, config: ProductionSeedConfig) {
+  console.log("[seed] connecting to database");
+  await withTimeout(client.$queryRaw`SELECT 1`, OPERATION_TIMEOUT_MS, "Database connection timed out");
+
+  console.log("[seed] checking existing admin");
+  const [userWithIin, existingAdmin] = await withTimeout(
+    Promise.all([
+      client.user.findUnique({
+        where: { iin: config.adminIin },
+        select: { id: true, role: true, status: true, passwordHash: true },
+      }),
+      client.user.findFirst({
+        where: { role: "ADMIN" },
+        select: { id: true, role: true, status: true, passwordHash: true },
+      }),
+    ]),
+    OPERATION_TIMEOUT_MS,
+    "Existing admin check timed out",
+  );
+
+  if (userWithIin) {
+    if (userWithIin.role !== "ADMIN") throw new Error("The configured admin IIN already belongs to a non-admin user");
+    if (existingAdmin && existingAdmin.id !== userWithIin.id) throw new Error("A different admin already exists");
+    if (userWithIin.status !== "ACTIVE") throw new Error("The existing admin is not active; no automatic account changes were made");
+    if (!userWithIin.passwordHash) throw new Error("The existing admin has no password hash; no automatic password changes were made");
+    console.log("[seed] completed");
+    return;
+  }
+  if (existingAdmin) throw new Error("An admin with a different IIN already exists");
+
+  console.log("[seed] hashing password");
+  const passwordHash = await withTimeout(
+    hash(config.adminPassword, 12),
+    OPERATION_TIMEOUT_MS,
+    "Password hashing timed out",
+  );
+
+  console.log("[seed] creating admin");
+  const createdAdmin = await withTimeout(
+    client.user.create({
+      data: {
+        iin: config.adminIin,
+        firstName: config.adminFirstName,
+        lastName: config.adminLastName,
+        role: "ADMIN",
+        status: "ACTIVE",
+        passwordHash,
+      },
+      select: { role: true, status: true, passwordHash: true },
+    }),
+    OPERATION_TIMEOUT_MS,
+    "Admin creation timed out",
+  );
+  if (createdAdmin.role !== "ADMIN" || createdAdmin.status !== "ACTIVE" || !createdAdmin.passwordHash) {
+    throw new Error("The created admin failed verification");
+  }
+  console.log("[seed] completed");
+}
+
+async function seedDevelopment(prisma: PrismaClient) {
   const adminEmail = requiredSeedValue("SEED_ADMIN_EMAIL");
   const teacherEmail = requiredSeedValue("SEED_TEACHER_EMAIL");
   const parentEmail = requiredSeedValue("SEED_PARENT_EMAIL");
@@ -133,4 +265,43 @@ async function main() {
   console.log("Happy Town seed complete: 1 admin, 4 teachers, 18 parents, 24 students, 5 groups.");
 }
 
-main().catch((error) => { console.error(error); process.exitCode = 1; }).finally(() => prisma.$disconnect());
+function safeErrorMessage(error: unknown) {
+  const message = error instanceof Error ? error.message : "Unknown seed error";
+  return message
+    .replace(/postgres(?:ql)?:\/\/\S+/gi, "[redacted database URL]")
+    .replace(/\b\d{12}\b/g, "[redacted IIN]");
+}
+
+async function run() {
+  const isProductionBootstrap = process.env.ALLOW_PRODUCTION_SEED === "true";
+  if (process.env.NODE_ENV === "production" && !isProductionBootstrap) {
+    throw new Error("Production seeding is disabled. Set ALLOW_PRODUCTION_SEED=true explicitly.");
+  }
+
+  if (isProductionBootstrap) {
+    console.log("[seed] validating environment");
+    const config = validateProductionEnvironment();
+    prisma = createPrismaClient(config.databaseUrl);
+    await seedProductionAdmin(prisma, config);
+    return;
+  }
+
+  const databaseUrl = requiredSeedValue("DATABASE_URL");
+  prisma = createPrismaClient(databaseUrl);
+  await seedDevelopment(prisma);
+}
+
+run()
+  .catch((error: unknown) => {
+    console.error(`[seed] failed: ${safeErrorMessage(error)}`);
+    process.exitCode = 1;
+  })
+  .finally(async () => {
+    if (!prisma) return;
+    try {
+      await withTimeout(prisma.$disconnect(), 5_000, "Database disconnect timed out");
+    } catch {
+      console.error("[seed] failed to disconnect cleanly");
+      process.exitCode = 1;
+    }
+  });
