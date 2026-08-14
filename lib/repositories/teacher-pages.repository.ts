@@ -7,7 +7,7 @@ const iso=(value:Date|null)=>value?.toISOString()??null;
 const monthStart=()=>{const now=new Date();return new Date(now.getFullYear(),now.getMonth(),1)};
 
 async function teacherIdentity(userId:string){
-  const teacher=await prisma.user.findFirst({where:{id:userId,role:"TEACHER",status:"ACTIVE",archivedAt:null,teacherProfile:{isNot:null}},select:{id:true,firstName:true,lastName:true,email:true,phone:true,status:true,createdAt:true}});
+  const teacher=await prisma.user.findFirst({where:{id:userId,role:"TEACHER",status:"ACTIVE",archivedAt:null,teacherProfile:{isNot:null}},select:{id:true,firstName:true,lastName:true,phone:true,status:true,createdAt:true}});
   if(!teacher)throw new AppError("NOT_FOUND","Профиль учителя не найден",404);
   return teacher;
 }
@@ -111,5 +111,5 @@ export async function getTeacherReviews(userId:string){
 }
 
 export async function getTeacherProfile(userId:string){
-  const teacher=await teacherIdentity(userId),groups=await getTeacherGroups(userId);return {id:teacher.id,firstName:teacher.firstName,lastName:teacher.lastName,name:fullName(teacher),email:teacher.email??"",phone:teacher.phone??"",status:teacher.status,createdAt:teacher.createdAt.toISOString(),groups,studentCount:groups.reduce((sum,item)=>sum+item.studentCount,0)};
+  const teacher=await teacherIdentity(userId),groups=await getTeacherGroups(userId);return {id:teacher.id,firstName:teacher.firstName,lastName:teacher.lastName,name:fullName(teacher),phone:teacher.phone??"",status:teacher.status,createdAt:teacher.createdAt.toISOString(),groups,studentCount:groups.reduce((sum,item)=>sum+item.studentCount,0)};
 }

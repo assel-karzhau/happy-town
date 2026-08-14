@@ -60,7 +60,7 @@ function Logo({ size = 72 }: { size?: number }) {
   return <Image src="/images/happy-town-logo.png" width={size} height={size} alt="Happy Town" className="logo" priority unoptimized />;
 }
 
-export function RoleShell({ role, user, children }: { role: Role; user: { name: string; email: string }; children: React.ReactNode }) {
+export function RoleShell({ role, user, children }: { role: Role; user: { name: string }; children: React.ReactNode }) {
   const pathname = usePathname();
   const [drawer, setDrawer] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -117,7 +117,7 @@ export function RoleShell({ role, user, children }: { role: Role; user: { name: 
         </div>
         <div className="page-heading"><p className="eyebrow">Электронный дневник</p><h1>{title}</h1></div>
         <div className="top-actions desktop-actions">
-          <div className="profile-chip"><span className="avatar">{initials}</span><span><b>{user.name}</b><small>{user.email}</small></span></div>
+          <div className="profile-chip"><span className="avatar">{initials}</span><span><b>{user.name}</b><small>{role === "teacher" ? "Учитель" : "Родитель"}</small></span></div>
           <button className="icon-btn" onClick={() => setLogoutOpen(true)} aria-label="Выйти"><LogOut size={18} /></button>
         </div>
       </header>

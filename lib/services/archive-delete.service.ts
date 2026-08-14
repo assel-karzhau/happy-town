@@ -5,6 +5,7 @@ import type { AuthenticatedActor } from "../permissions/actor";
 import { requireRole } from "../permissions/actor";
 import { writeAuditLog } from "./audit.service";
 import { restoreGroup, restoreStudent, restoreUser } from "./management.service";
+import type { Prisma } from "../../generated/prisma/client";
 
 export const archiveKinds=["parents","teachers","students","groups","courses","books","units","topics"] as const;
 export type ArchiveKind=(typeof archiveKinds)[number];
@@ -12,7 +13,28 @@ export type DeletePreview={kind:ArchiveKind;id:string;name:string;confirmation:s
 
 const idSchema=z.string().uuid();
 const dependencySum=(dependencies:Record<string,number>)=>Object.values(dependencies).reduce((sum,value)=>sum+value,0);
-const preview=(kind:ArchiveKind,id:string,name:string,confirmation:string,dependencies:Record<string,number>):DeletePreview=>({kind,id,name,confirmation,dependencies,blocked:dependencySum(dependencies)>0});
+const preview=(kind:ArchiveKind,id:string,name:string,confirmation:string,dependencies:Record<string,number>,blocked=dependencySum(dependencies)>0):DeletePreview=>({kind,id,name,confirmation,dependencies,blocked});
+
+async function deleteStudentDependencies(tx:Prisma.TransactionClient,studentId:string){
+  const [testResults,monthlyAssessments]=await Promise.all([
+    tx.testResult.findMany({where:{studentId},select:{id:true}}),
+    tx.monthlyAssessment.findMany({where:{studentId},select:{id:true}}),
+  ]);
+  const testResultIds=testResults.map(item=>item.id),assessmentIds=monthlyAssessments.map(item=>item.id);
+  const deleted:Record<string,number>={};
+  if(testResultIds.length)deleted.testSkillScores=(await tx.testResultSkillScore.deleteMany({where:{testResultId:{in:testResultIds}}})).count;
+  if(assessmentIds.length)deleted.monthlySkillScores=(await tx.monthlySkillScore.deleteMany({where:{assessmentId:{in:assessmentIds}}})).count;
+  deleted.attendance=(await tx.attendance.deleteMany({where:{studentId}})).count;
+  deleted.homeworkStatuses=(await tx.studentHomeworkStatus.deleteMany({where:{studentId}})).count;
+  deleted.wordProgress=(await tx.studentWordProgress.deleteMany({where:{studentId}})).count;
+  deleted.testResults=(await tx.testResult.deleteMany({where:{studentId}})).count;
+  deleted.monthlyAssessments=(await tx.monthlyAssessment.deleteMany({where:{studentId}})).count;
+  deleted.teacherReviews=(await tx.teacherReview.deleteMany({where:{studentId}})).count;
+  deleted.learningHistory=(await tx.learningHistoryEvent.deleteMany({where:{studentId}})).count;
+  deleted.enrollments=(await tx.studentGroupEnrollment.deleteMany({where:{studentId}})).count;
+  deleted.parentRelations=(await tx.parentStudentRelation.deleteMany({where:{studentId}})).count;
+  return deleted;
+}
 
 export async function getDeletePreview(kind:ArchiveKind,rawId:string,actor:AuthenticatedActor|null):Promise<DeletePreview>{
   requireRole(actor,["ADMIN"]);const id=idSchema.parse(rawId);
@@ -26,7 +48,7 @@ export async function getDeletePreview(kind:ArchiveKind,rawId:string,actor:Authe
   if(kind==="students"){
     const row=await prisma.student.findFirst({where:{id,archivedAt:{not:null}},select:{id:true,firstName:true,lastName:true,_count:{select:{parentRelations:true,enrollments:true,attendance:true,homeworkStatuses:true,wordProgress:true,testResults:true,monthlyAssessments:true,teacherReviews:true,learningHistory:true}}}});
     if(!row)throw new AppError("NOT_FOUND","Архивный ученик не найден",404);const c=row._count;
-    return preview(kind,row.id,`${row.firstName} ${row.lastName}`,`${row.firstName} ${row.lastName}`,{"Родители":c.parentRelations,"Зачисления":c.enrollments,"Посещаемость":c.attendance,"Домашние задания":c.homeworkStatuses,"Слова":c.wordProgress,"Тесты":c.testResults,"Оценки и отзывы":c.monthlyAssessments+c.teacherReviews,"История обучения":c.learningHistory});
+    return preview(kind,row.id,`${row.firstName} ${row.lastName}`,`${row.firstName} ${row.lastName}`,{"Родители":c.parentRelations,"Зачисления":c.enrollments,"Посещаемость":c.attendance,"Домашние задания":c.homeworkStatuses,"Слова":c.wordProgress,"Тесты":c.testResults,"Оценки и отзывы":c.monthlyAssessments+c.teacherReviews,"История обучения":c.learningHistory},false);
   }
   if(kind==="groups"){
     const row=await prisma.group.findFirst({where:{id,archivedAt:{not:null}},select:{id:true,name:true,_count:{select:{teacherAssignments:true,enrollments:true,lessons:true,homeworks:true,tests:true,assessments:true,reviews:true,historyEvents:true}}}});
@@ -38,8 +60,8 @@ export async function getDeletePreview(kind:ArchiveKind,rawId:string,actor:Authe
     return preview(kind,row.id,row.name,row.name,{"Учебники":row._count.books,"Группы":row._count.groups,"Категории навыков":row._count.skillCategories});
   }
   if(kind==="books"){
-    const row=await prisma.book.findFirst({where:{id,archivedAt:{not:null}},select:{id:true,name:true,_count:{select:{courses:true,units:true,groups:true,lessons:true,homeworks:true,historyEvents:true}}}});if(!row)throw new AppError("NOT_FOUND","Архивный учебник не найден",404);const c=row._count;
-    return preview(kind,row.id,row.name,row.name,{"Курсы":c.courses,"Разделы":c.units,"Группы":c.groups,"Уроки":c.lessons,"Домашние задания":c.homeworks,"История обучения":c.historyEvents});
+    const row=await prisma.book.findFirst({where:{id,archivedAt:{not:null}},select:{id:true,name:true,_count:{select:{units:true,groups:true,lessons:true,homeworks:true,historyEvents:true}}}});if(!row)throw new AppError("NOT_FOUND","Архивный учебник не найден",404);const c=row._count;
+    return preview(kind,row.id,row.name,row.name,{"Разделы":c.units,"Группы":c.groups,"Уроки":c.lessons,"Домашние задания":c.homeworks,"История обучения":c.historyEvents});
   }
   if(kind==="units"){
     const row=await prisma.unit.findFirst({where:{id,archivedAt:{not:null}},select:{id:true,name:true,_count:{select:{topics:true,lessons:true,tests:true,historyEvents:true}}}});if(!row)throw new AppError("NOT_FOUND","Архивный раздел не найден",404);const c=row._count;
@@ -56,13 +78,13 @@ export async function permanentlyDeleteArchived(kind:ArchiveKind,rawId:string,ra
   await prisma.$transaction(async tx=>{
     if(kind==="parents"){await tx.parentProfile.deleteMany({where:{userId:deletion.id}});await tx.user.delete({where:{id:deletion.id}});}
     else if(kind==="teachers"){await tx.teacherProfile.deleteMany({where:{userId:deletion.id}});await tx.user.delete({where:{id:deletion.id}});}
-    else if(kind==="students")await tx.student.delete({where:{id:deletion.id}});
+    else if(kind==="students"){const cascaded=await deleteStudentDependencies(tx,deletion.id);await tx.student.delete({where:{id:deletion.id}});deletion.dependencies={...deletion.dependencies,...cascaded};}
     else if(kind==="groups")await tx.group.delete({where:{id:deletion.id}});
     else if(kind==="courses")await tx.course.delete({where:{id:deletion.id}});
-    else if(kind==="books")await tx.book.delete({where:{id:deletion.id}});
+    else if(kind==="books"){await tx.courseBook.deleteMany({where:{bookId:deletion.id}});await tx.book.delete({where:{id:deletion.id}});}
     else if(kind==="units")await tx.unit.delete({where:{id:deletion.id}});
     else await tx.topic.delete({where:{id:deletion.id}});
-    await writeAuditLog(tx,{actorUserId:trusted.userId,action:"DELETE",entityType:kind,entityId:deletion.id,previousData:{name:deletion.name,archived:true},metadata:{permanent:true}});
+    await writeAuditLog(tx,{actorUserId:trusted.userId,action:"DELETE",entityType:kind,entityId:deletion.id,previousData:{name:deletion.name,archived:true},metadata:{permanent:true,deletedDependencies:deletion.dependencies}});
   });
   return {id:deletion.id,deleted:true};
 }

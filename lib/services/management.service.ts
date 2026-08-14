@@ -121,7 +121,6 @@ export async function restoreStudent(studentId:string, actor:AuthenticatedActor|
 export async function createGroup(raw:unknown, actor:AuthenticatedActor|null) {
   const trusted=requireRole(actor,["ADMIN"]), input=createGroupSchema.parse(raw);
   return prisma.$transaction(async tx=>{
-    const link=await tx.courseBook.findUnique({where:{courseId_bookId:{courseId:input.courseId,bookId:input.bookId}},select:{id:true}}); if(!link) throw new AppError("BUSINESS_RULE_VIOLATION","Учебник не входит в выбранный курс",409);
     const created=await tx.group.create({data:input,select:{id:true,name:true,level:true,capacity:true,status:true,startDate:true,endDate:true}});
     await writeAuditLog(tx,{actorUserId:trusted.userId,action:"CREATE",entityType:"Group",entityId:created.id,newData:created}); return created;
   });
@@ -130,8 +129,6 @@ export async function createGroup(raw:unknown, actor:AuthenticatedActor|null) {
 export async function createGroupWithTeacher(raw:unknown, actor:AuthenticatedActor|null) {
   const trusted=requireRole(actor,["ADMIN"]), teacherId=z.string().uuid().optional().nullable().parse((raw as {teacherId?:unknown})?.teacherId), input=createGroupSchema.parse(raw);
   return prisma.$transaction(async tx=>{
-    const link=await tx.courseBook.findUnique({where:{courseId_bookId:{courseId:input.courseId,bookId:input.bookId}},select:{id:true}});
-    if(!link)throw new AppError("BUSINESS_RULE_VIOLATION","Учебник не входит в выбранный курс",409);
     if(teacherId&&!await tx.user.findFirst({where:{id:teacherId,role:"TEACHER",status:"ACTIVE",archivedAt:null},select:{id:true}}))throw new AppError("NOT_FOUND","Активный учитель не найден",404);
     const created=await tx.group.create({data:input,select:{id:true,name:true,level:true,capacity:true,status:true,startDate:true,endDate:true}});
     if(teacherId){const assignment=await tx.teacherGroupAssignment.create({data:{teacherId,groupId:created.id,startedAt:input.startDate,isCurrent:true},select:{id:true,teacherId:true,groupId:true,startedAt:true}});await writeAuditLog(tx,{actorUserId:trusted.userId,action:"LINK",entityType:"TeacherGroupAssignment",entityId:assignment.id,newData:assignment});}

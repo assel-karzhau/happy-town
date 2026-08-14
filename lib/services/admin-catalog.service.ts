@@ -10,7 +10,7 @@ const optionalText = z.string().trim().max(500).optional().nullable();
 const statusSchema = z.enum(["ACTIVE", "INACTIVE"]);
 
 const bookCreateSchema = z.object({
-  name:z.string().trim().min(1,"Укажите название").max(200), author:optionalText, publisher:optionalText,
+  name:z.string().trim().min(1,"Укажите название").max(200),
   level:z.string().trim().min(1,"Укажите уровень").max(50), description:optionalText,
 });
 const bookUpdateSchema = bookCreateSchema.partial().extend({status:statusSchema.optional()});
@@ -24,9 +24,7 @@ export async function createCatalogEntity(kind:AdminCatalogKind, raw:unknown, ac
   if(kind==="books") {
     const input=bookCreateSchema.parse(raw);
     return prisma.$transaction(async tx=>{
-      const course=await tx.course.findFirst({where:{archivedAt:null,status:"ACTIVE"},select:{id:true},orderBy:{createdAt:"asc"}});
-      if(!course)throw new AppError("BUSINESS_RULE_VIOLATION","Не найден базовый активный курс для системной привязки учебника",409);
-      const created=await tx.book.create({data:{...input,courses:{create:{courseId:course.id,isPrimary:false}}},select:{id:true,name:true,author:true,publisher:true,level:true,description:true,status:true}});
+      const created=await tx.book.create({data:input,select:{id:true,name:true,level:true,description:true,status:true}});
       await writeAuditLog(tx,{actorUserId:trusted.userId,action:"CREATE",entityType:"Book",entityId:created.id,newData:created});
       return created;
     });
@@ -56,9 +54,9 @@ export async function updateCatalogEntity(kind:AdminCatalogKind, id:string, raw:
   return prisma.$transaction(async tx=>{
     if(kind==="books") {
       const input=bookUpdateSchema.parse(raw);
-      const previous=await tx.book.findFirst({where:{id,archivedAt:null},select:{id:true,name:true,author:true,publisher:true,level:true,description:true,status:true}});
+      const previous=await tx.book.findFirst({where:{id,archivedAt:null},select:{id:true,name:true,level:true,description:true,status:true}});
       if(!previous)throw new AppError("NOT_FOUND","Учебник не найден",404);
-      const updated=await tx.book.update({where:{id},data:input,select:{id:true,name:true,author:true,publisher:true,level:true,description:true,status:true}});
+      const updated=await tx.book.update({where:{id},data:input,select:{id:true,name:true,level:true,description:true,status:true}});
       await writeAuditLog(tx,{actorUserId:trusted.userId,action:"UPDATE",entityType:"Book",entityId:id,previousData:previous,newData:updated});return updated;
     }
     if(kind==="units") {

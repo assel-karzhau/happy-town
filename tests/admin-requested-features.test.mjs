@@ -13,6 +13,17 @@ test("parent and teacher registration do not request email and temporary passwor
   assert.match(validators, /value\.role==="ADMIN"&&!value\.email/);
 });
 
+test("parent and teacher profiles no longer expose or edit email", async () => {
+  const [teacherPage,parentPage,editor,shell,service] = await Promise.all([
+    read("components/teacher-pages.tsx"),read("components/parent-pages.tsx"),read("components/profile-editor.tsx"),read("components/role-shell.tsx"),read("lib/services/teacher-content.service.ts"),
+  ]);
+  for (const source of [teacherPage,parentPage,editor,shell]) assert.doesNotMatch(source, /<dt>Email|<span>Email|name="email"|user\.email/);
+  const profileUpdate=service.slice(service.indexOf("export async function updateOwnProfile"));
+  assert.doesNotMatch(profileUpdate, /email/);
+  assert.match(profileUpdate, /firstName/);
+  assert.match(profileUpdate, /phone/);
+});
+
 test("group editor hides course and academic period while roster mutations keep the dialog open", async () => {
   const portal = await read("components/admin-database-portal.tsx");
   assert.doesNotMatch(portal, /<span>Курс(?: \*)?<\/span>/);
@@ -35,6 +46,9 @@ test("admin catalog CRUD is authenticated, role-protected and audited", async ()
   assert.match(manager, /Добавить учебник/);
   assert.match(manager, /Добавить раздел/);
   assert.match(manager, /Добавить категорию/);
+  assert.doesNotMatch(manager, /<span>Автор<\/span>|<span>Издательство<\/span>|setAuthor|setPublisher/);
+  assert.doesNotMatch(service, /базовый активный курс|courses:\{create/);
+  assert.match(service, /tx\.book\.create\(\{data:input/);
 });
 
 test("admin mobile menu exposes logout and catalog layout has mobile overrides", async () => {

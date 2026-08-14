@@ -38,7 +38,7 @@ export async function getAdminPortalData(): Promise<AdminPortalData> {
     prisma.student.findMany({where:{archivedAt:null},select:studentSelect,orderBy:[{lastName:"asc"},{firstName:"asc"}]}),
     prisma.group.findMany({where:{archivedAt:null},select:groupSelect,orderBy:{name:"asc"}}),
     prisma.course.findMany({where:{archivedAt:null,status:"ACTIVE"},select:{id:true,name:true},orderBy:{name:"asc"}}),
-    prisma.book.findMany({where:{archivedAt:null,status:"ACTIVE"},select:{id:true,name:true,courses:{select:{courseId:true}}},orderBy:{name:"asc"}}),
+    prisma.book.findMany({where:{archivedAt:null,status:"ACTIVE"},select:{id:true,name:true},orderBy:{name:"asc"}}),
     prisma.academicPeriod.findMany({where:{archivedAt:null},select:{id:true,name:true},orderBy:{startDate:"desc"}}),
     prisma.user.findMany({where:{archivedAt:{not:null},role:{in:["PARENT","TEACHER"]}},select:{id:true,firstName:true,lastName:true,role:true,archivedAt:true}}),
     prisma.student.findMany({where:{archivedAt:{not:null}},select:{id:true,firstName:true,lastName:true,archivedAt:true}}),
@@ -48,7 +48,7 @@ export async function getAdminPortalData(): Promise<AdminPortalData> {
     prisma.unit.findMany({where:{archivedAt:{not:null}},select:{id:true,name:true,archivedAt:true}}),
     prisma.topic.findMany({where:{archivedAt:{not:null}},select:{id:true,name:true,archivedAt:true}}),
     prisma.course.findMany({where:{archivedAt:null},select:{id:true,name:true,description:true,level:true,status:true,_count:{select:{books:true}}},orderBy:{name:"asc"}}),
-    prisma.book.findMany({where:{archivedAt:null},select:{id:true,name:true,author:true,publisher:true,description:true,level:true,status:true,courses:{select:{course:{select:{name:true}}}},_count:{select:{units:true}}},orderBy:{name:"asc"}}),
+    prisma.book.findMany({where:{archivedAt:null},select:{id:true,name:true,description:true,level:true,status:true,_count:{select:{units:true}}},orderBy:{name:"asc"}}),
     prisma.unit.findMany({where:{archivedAt:null},select:{id:true,bookId:true,name:true,description:true,status:true,book:{select:{name:true}},_count:{select:{topics:true}}},orderBy:[{book:{name:"asc"}},{order:"asc"}]}),
     prisma.topic.findMany({where:{archivedAt:null},select:{id:true,name:true,description:true,status:true,unit:{select:{name:true}}},orderBy:[{unit:{name:"asc"}},{order:"asc"}]}),
     prisma.skillCategory.findMany({where:{archivedAt:null},select:{id:true,code:true,name:true,description:true,isActive:true,_count:{select:{courseLinks:true}}},orderBy:{order:"asc"}}),
@@ -65,10 +65,10 @@ export async function getAdminPortalData(): Promise<AdminPortalData> {
   ].sort((a,b)=>b.archivedAt.localeCompare(a.archivedAt));
   return {
     parents:parents.map(parentDto),teachers:teachers.map(teacherDto),students:students.map(studentDto),groups:groups.map(groupDto),archived,
-    catalogs:{courses,books:books.map(row=>({id:row.id,name:row.name,courseId:row.courses[0]?.courseId})),periods},
+    catalogs:{courses,books,periods},
     catalogData:{
       courses:catalogCourses.map(row=>({id:row.id,name:row.name,description:row.description??"",level:row.level,status:status(row.status),bookCount:row._count.books})),
-      books:catalogBooks.map(row=>({id:row.id,name:row.name,author:row.author??"",publisher:row.publisher??"",description:row.description??"",level:row.level,status:status(row.status),courseNames:row.courses.map(link=>link.course.name),unitCount:row._count.units})),
+      books:catalogBooks.map(row=>({id:row.id,name:row.name,description:row.description??"",level:row.level,status:status(row.status),unitCount:row._count.units})),
       units:catalogUnits.map(row=>({id:row.id,bookId:row.bookId,name:row.name,description:row.description??"",bookName:row.book.name,status:status(row.status),topicCount:row._count.topics})),
       topics:catalogTopics.map(row=>({id:row.id,name:row.name,description:row.description??"",unitName:row.unit.name,status:status(row.status)})),
       skills:catalogSkills.map(row=>({id:row.id,code:row.code,name:row.name,description:row.description??"",isActive:row.isActive,courseCount:row._count.courseLinks})),

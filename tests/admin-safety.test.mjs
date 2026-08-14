@@ -15,6 +15,21 @@ test("permanent archive deletion is admin-only, dependency-aware and audited", a
   assert.doesNotMatch(service, /onDelete:\s*Cascade/);
 });
 
+test("archived students can be permanently deleted with their owned records in one transaction", async () => {
+  const [service,portal] = await Promise.all([
+    read("lib/services/archive-delete.service.ts"),read("components/admin-database-portal.tsx"),
+  ]);
+  assert.match(service, /async function deleteStudentDependencies/);
+  for (const delegate of ["attendance","studentHomeworkStatus","studentWordProgress","testResult","monthlyAssessment","teacherReview","learningHistoryEvent","studentGroupEnrollment","parentStudentRelation"]) {
+    assert.match(service,new RegExp(`tx\\.${delegate}\\.deleteMany\\(\\{where:\\{studentId`));
+  }
+  assert.match(service, /"История обучения":c\.learningHistory\},false\)/);
+  assert.match(service, /await deleteStudentDependencies\(tx,deletion\.id\)/);
+  assert.match(service, /metadata:\{permanent:true,deletedDependencies:deletion\.dependencies\}/);
+  assert.match(portal, /Связанные данные тоже будут удалены/);
+  assert.match(portal, /!preview\.blocked&&<label className="destructive-confirm"/);
+});
+
 test("archive API rechecks the authenticated admin on preview, restore and delete", async () => {
   const route = await read("app/api/admin/archive/[kind]/[id]/route.ts");
   assert.equal(route.match(/await requireAdmin\(\)/g)?.length, 3);
