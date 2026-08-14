@@ -25,9 +25,18 @@ test("parent and teacher profiles no longer expose or edit email", async () => {
 });
 
 test("group editor hides course and academic period while roster mutations keep the dialog open", async () => {
-  const portal = await read("components/admin-database-portal.tsx");
+  const [portal,service,validators] = await Promise.all([
+    read("components/admin-database-portal.tsx"),read("lib/services/management.service.ts"),read("lib/validators/index.ts"),
+  ]);
   assert.doesNotMatch(portal, /<span>Курс(?: \*)?<\/span>/);
   assert.doesNotMatch(portal, /<span>Учебный период(?: \*)?<\/span>/);
+  assert.doesNotMatch(portal, /data\.catalogs\.(courses|periods)/);
+  assert.match(validators, /createGroupRequestSchema = groupBaseSchema\.omit\(\{courseId:true,academicPeriodId:true,startDate:true\}/);
+  assert.match(service, /async function resolveGroupContext/);
+  assert.match(service, /tx\.course\.upsert/);
+  assert.match(service, /tx\.academicPeriod\.upsert/);
+  assert.match(service, /where:\{id:bookId,status:"ACTIVE",archivedAt:null\}/);
+  assert.match(service, /input=createGroupRequestSchema\.parse\(raw\)/);
   assert.match(portal, /onChanged=\{message=>\{notify\(message\);refresh\(\)\}\}/);
   assert.match(portal, /setMemberIds\(current=>current\.filter/);
 });
