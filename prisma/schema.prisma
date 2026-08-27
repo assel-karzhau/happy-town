@@ -86,6 +86,11 @@ enum LessonStatus {
   CANCELLED
 }
 
+enum PaymentStatus {
+  PAID
+  UNPAID
+}
+
 enum AttendanceStatus {
   PRESENT
   ABSENT
@@ -245,6 +250,7 @@ model Student {
   monthlyAssessments MonthlyAssessment[]
   teacherReviews     TeacherReview[]
   learningHistory    LearningHistoryEvent[]
+  payments           StudentPayment[]
 
   @@index([status, archivedAt])
   @@index([lastName, firstName])
@@ -509,6 +515,24 @@ model Attendance {
   @@unique([lessonId, studentId])
   @@index([studentId, createdAt])
   @@map("attendance")
+}
+
+model StudentPayment {
+  id           String        @id @default(uuid()) @db.Uuid
+  studentId    String        @db.Uuid
+  periodNumber Int
+  lessonFrom   Int
+  lessonTo     Int
+  status       PaymentStatus @default(UNPAID)
+  paidAt       DateTime?
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+  student      Student       @relation(fields: [studentId], references: [id], onDelete: Restrict)
+
+  @@unique([studentId, periodNumber])
+  @@index([studentId, status])
+  @@index([status, lessonTo])
+  @@map("student_payments")
 }
 
 model Homework {

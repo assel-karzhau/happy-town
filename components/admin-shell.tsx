@@ -4,19 +4,20 @@ import Image from "next/image";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
 import { useState } from "react";
-import { Archive, BookOpen, ChevronRight, GraduationCap, History, Home, Layers3, LogOut, Menu, MoreHorizontal, ShieldCheck, Star, UserRound, UsersRound, X } from "lucide-react";
+import { Archive, BookOpen, ChevronRight, CircleDollarSign, GraduationCap, History, Home, Layers3, LogOut, Menu, MoreHorizontal, ShieldCheck, Star, UserRound, UsersRound, X } from "lucide-react";
 import { AdminCatalogManager } from "./admin-catalog-manager";
 import { AdminDatabasePortal } from "./admin-database-portal";
+import { AdminPayments } from "./admin-payments";
 import { EntityStatusBadge } from "./ui/entity-status-badge";
 import type { AdminCatalogData, AdminPortalData } from "../lib/types/admin-api";
 
-type Page = "home"|"teachers"|"parents"|"students"|"groups"|"books"|"units"|"topics"|"skills"|"history"|"archive"|"profile";
+type Page = "home"|"teachers"|"parents"|"students"|"groups"|"payments"|"books"|"units"|"topics"|"skills"|"history"|"archive"|"profile";
 type User = {name:string;email:string};
 const navigation:Array<{page:Page;label:string;icon:typeof Home}>=[
   {page:"home",label:"Главная",icon:Home},{page:"teachers",label:"Учителя",icon:UserRound},{page:"parents",label:"Родители",icon:UsersRound},{page:"students",label:"Ученики",icon:GraduationCap},{page:"groups",label:"Группы",icon:UsersRound},
-  {page:"books",label:"Учебники",icon:BookOpen},{page:"units",label:"Разделы и темы",icon:Layers3},{page:"skills",label:"Категории навыков",icon:Star},{page:"history",label:"История обучения",icon:History},{page:"archive",label:"Архив",icon:Archive},{page:"profile",label:"Профиль",icon:UserRound},
+  {page:"payments",label:"Оплата",icon:CircleDollarSign},{page:"books",label:"Учебники",icon:BookOpen},{page:"units",label:"Разделы и темы",icon:Layers3},{page:"skills",label:"Категории навыков",icon:Star},{page:"history",label:"История обучения",icon:History},{page:"archive",label:"Архив",icon:Archive},{page:"profile",label:"Профиль",icon:UserRound},
 ];
-const titles:Record<Page,string>={home:"Главная",teachers:"Учителя",parents:"Родители",students:"Ученики",groups:"Группы",books:"Учебники",units:"Разделы и темы",topics:"Разделы и темы",skills:"Категории навыков",history:"История обучения",archive:"Архив",profile:"Профиль"};
+const titles:Record<Page,string>={home:"Главная",teachers:"Учителя",parents:"Родители",students:"Ученики",groups:"Группы",payments:"Оплата",books:"Учебники",units:"Разделы и темы",topics:"Разделы и темы",skills:"Категории навыков",history:"История обучения",archive:"Архив",profile:"Профиль"};
 const href=(page:Page)=>page==="home"?"/admin":`/admin/${page}`;
 
 function Logo({size=72}:{size?:number}) { return <Image src="/images/happy-town-logo.png" width={size} height={size} alt="Happy Town" className="logo" priority unoptimized/>; }
@@ -34,7 +35,7 @@ function CatalogPage({page,data,user}:{page:Page;data:AdminCatalogData;user:User
   return <section className="section-card"><div className="profile-hero"><span className="avatar big">{user.name.split(" ").map(part=>part[0]).slice(0,2).join("")}</span><div><h3>{user.name}</h3><p>Администратор</p></div></div><dl className="profile-dl"><div><dt>Email</dt><dd>{user.email||"Не указан"}</dd></div><div><dt>Роль</dt><dd>Администратор</dd></div><div><dt>Статус</dt><dd><EntityStatusBadge status="active" label="Активен"/></dd></div></dl></section>;
 }
 
-function Content({page,data,user}:{page:Page;data:AdminPortalData;user:User}) { return ["home","teachers","parents","students","groups","archive"].includes(page)?<AdminDatabasePortal page={page} initial={data}/>:<CatalogPage page={page} data={data.catalogData} user={user}/>; }
+function Content({page,data,user}:{page:Page;data:AdminPortalData;user:User}) { return page==="payments"?<AdminPayments/>:["home","teachers","parents","students","groups","archive"].includes(page)?<AdminDatabasePortal page={page} initial={data}/>:<CatalogPage page={page} data={data.catalogData} user={user}/>; }
 
 export function AdminShell({page,data,user}:{page:Page;data:AdminPortalData;user:User}) {
   const [drawer,setDrawer]=useState(false);const [more,setMore]=useState(false);const [logout,setLogout]=useState(false);

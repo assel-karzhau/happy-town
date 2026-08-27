@@ -13,6 +13,27 @@ export type AdminCatalogData = {
   history: Array<{id:string;eventDate:string;eventType:string;title:string;description:string;studentName:string;actorName:string}>;
 };
 
+export type PaymentStatus = "PAID" | "UNPAID";
+export type AdminPaymentRow = {
+  id: string | null;
+  studentId: string;
+  studentName: string;
+  teacherId: string | null;
+  teacherName: string;
+  completedLessons: number;
+  periodNumber: number;
+  lessonFrom: number;
+  lessonTo: number;
+  status: PaymentStatus;
+  paidAt: string | null;
+  isDue: boolean;
+};
+export type AdminPaymentsData = {
+  rows: AdminPaymentRow[];
+  teachers: Array<{ id: string; name: string }>;
+  summary: { students: number; due: number; paidCurrentPeriods: number };
+};
+
 export type AdminPortalData = {
   parents: Parent[];
   teachers: Teacher[];
