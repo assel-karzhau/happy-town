@@ -126,20 +126,35 @@ function academicYearFor(value:Date){
   return {name:`${startYear}-${startYear+1}`,startDate:new Date(Date.UTC(startYear,8,1)),endDate:new Date(Date.UTC(startYear+1,7,31))};
 }
 
-async function resolveGroupContext(tx:Prisma.TransactionClient,bookId:string,startDate:Date){
+export async function resolveGroupContext(tx:Prisma.TransactionClient,bookId:string,startDate:Date){
   const book=await tx.book.findFirst({where:{id:bookId,status:"ACTIVE",archivedAt:null},select:{id:true}});
   if(!book)throw new AppError("NOT_FOUND","Активный учебник не найден",404);
   let course=await tx.course.findFirst({where:{status:"ACTIVE",archivedAt:null},orderBy:{createdAt:"asc"},select:{id:true}});
   if(!course)course=await tx.course.upsert({where:{name:SYSTEM_COURSE_NAME},update:{status:"ACTIVE",archivedAt:null},create:{name:SYSTEM_COURSE_NAME,level:"Все уровни",description:"Служебная программа для групп Happy Town"},select:{id:true}});
   let period=await tx.academicPeriod.findFirst({where:{status:"CURRENT",archivedAt:null,startDate:{lte:startDate},endDate:{gte:startDate}},orderBy:{startDate:"desc"},select:{id:true}});
-  if(!period){const range=academicYearFor(startDate);period=await tx.academicPeriod.upsert({where:{name_startDate_endDate:range},update:{status:"CURRENT",isCurrent:true,archivedAt:null},create:{...range,type:"ACADEMIC_YEAR",status:"CURRENT",isCurrent:true},select:{id:true}});}
+  if(!period){
+    const range=academicYearFor(startDate);
+    const existing=await tx.academicPeriod.findUnique({where:{name_startDate_endDate:range},select:{id:true,archivedAt:true}});
+    if(existing&&!existing.archivedAt) period=existing;
+    else {
+      const current=await tx.academicPeriod.findFirst({where:{isCurrent:true,archivedAt:null},select:{id:true}});
+      const status=current?"PLANNED":"CURRENT",isCurrent=!current;
+      period=await tx.academicPeriod.upsert({where:{name_startDate_endDate:range},update:{status,isCurrent,archivedAt:null},create:{...range,type:"ACADEMIC_YEAR",status,isCurrent},select:{id:true}});
+    }
+  }
   return {courseId:course.id,academicPeriodId:period.id};
+}
+
+async function ensureGroupNameAvailable(tx:Prisma.TransactionClient,name:string,academicPeriodId:string){
+  const existing=await tx.group.findFirst({where:{name,academicPeriodId},select:{id:true}});
+  if(existing)throw new AppError("CONFLICT","Группа с таким названием уже существует в этом учебном периоде, в том числе в архиве",409);
 }
 
 export async function createGroup(raw:unknown, actor:AuthenticatedActor|null) {
   const trusted=requireRole(actor,["ADMIN"]), input=createGroupRequestSchema.parse(raw);
   return prisma.$transaction(async tx=>{
     const startDate=input.startDate??new Date(),context=await resolveGroupContext(tx,input.bookId,startDate);
+    await ensureGroupNameAvailable(tx,input.name,context.academicPeriodId);
     const created=await tx.group.create({data:{...input,...context,startDate},select:{id:true,name:true,level:true,capacity:true,status:true,startDate:true,endDate:true}});
     await writeAuditLog(tx,{actorUserId:trusted.userId,action:"CREATE",entityType:"Group",entityId:created.id,newData:created}); return created;
   });
@@ -150,6 +165,7 @@ export async function createGroupWithTeacher(raw:unknown, actor:AuthenticatedAct
   return prisma.$transaction(async tx=>{
     if(teacherId&&!await tx.user.findFirst({where:{id:teacherId,role:"TEACHER",status:"ACTIVE",archivedAt:null},select:{id:true}}))throw new AppError("NOT_FOUND","Активный учитель не найден",404);
     const startDate=input.startDate??new Date(),context=await resolveGroupContext(tx,input.bookId,startDate);
+    await ensureGroupNameAvailable(tx,input.name,context.academicPeriodId);
     const created=await tx.group.create({data:{...input,...context,startDate},select:{id:true,name:true,level:true,capacity:true,status:true,startDate:true,endDate:true}});
     if(teacherId){const assignment=await tx.teacherGroupAssignment.create({data:{teacherId,groupId:created.id,startedAt:startDate,isCurrent:true},select:{id:true,teacherId:true,groupId:true,startedAt:true}});await writeAuditLog(tx,{actorUserId:trusted.userId,action:"LINK",entityType:"TeacherGroupAssignment",entityId:assignment.id,newData:assignment});}
     await writeAuditLog(tx,{actorUserId:trusted.userId,action:"CREATE",entityType:"Group",entityId:created.id,newData:created}); return created;

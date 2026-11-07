@@ -12,6 +12,9 @@ const englishErrors: Record<string, string> = {
 
 // Keep API responses unchanged; localize their stable codes only at the display boundary.
 export function apiErrorMessage(locale: Locale, result: { code?: unknown; error?: unknown }, fallback: string): string {
-  if (locale === "en") return typeof result.code === "string" ? englishErrors[result.code] ?? fallback : fallback;
+  if (locale === "en") {
+    if (result.code === "CONFLICT" && result.error === "Группа с таким названием уже существует в этом учебном периоде, в том числе в архиве") return "A group with this name already exists in this academic period, including the archive.";
+    return typeof result.code === "string" ? englishErrors[result.code] ?? fallback : fallback;
+  }
   return typeof result.error === "string" && result.error ? result.error : fallback;
 }
