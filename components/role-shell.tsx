@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { LanguageSwitcher, useI18n } from "./i18n-provider";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { signOut } from "next-auth/react";
@@ -49,25 +50,21 @@ const navigation: Record<Role, NavItem[]> = {
   ],
 };
 
-const titles: Record<string, string> = {
-  teacher: "Кабинет учителя", parent: "Кабинет родителя", groups: "Мои группы", attendance: "Посещаемость",
-  lessons: "Уроки и темы", topics: "Темы и уроки", homework: "Домашние задания", words: "Слова",
-  tests: "Тесты", assessments: "Ежемесячные оценки", reviews: "Отзывы", students: "Ученики",
-  profile: "Профиль", progress: "Прогресс", history: "История обучения",
-};
 
 function Logo({ size = 72 }: { size?: number }) {
   return <Image src="/images/happy-town-logo.png" width={size} height={size} alt="Happy Town" className="logo" priority unoptimized />;
 }
 
 export function RoleShell({ role, user, children }: { role: Role; user: { name: string }; children: React.ReactNode }) {
+  const { t } = useI18n();
   const pathname = usePathname();
   const [drawer, setDrawer] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [logoutOpen, setLogoutOpen] = useState(false);
-  const nav = navigation[role];
+  const nav = navigation[role].map(item => ({ ...item, label: t(item.key === "reviews" && role === "parent" ? "teacherReviews" : item.key) }));
   const pageKey = pathname.split("/").filter(Boolean)[1] ?? role;
-  const title = titles[pageKey] ?? "Happy Town";
+  const titleKeys: Record<string, Parameters<typeof t>[0]> = { teacher: "teacherDashboard", parent: "parentDashboard", groups: "groups", attendance: "attendance", lessons: "lessons", topics: "topicLessons", homework: "homework", words: "words", tests: "tests", assessments: "assessments", reviews: "reviews", students: "students", profile: "profile", progress: "progress", history: "history" };
+  const title = titleKeys[pageKey] ? t(titleKeys[pageKey]) : "Happy Town";
   const primary = role === "teacher" ? nav.slice(0, 4) : [nav[0], nav[1], nav[3], nav[6]];
   const more = nav.filter((item) => !primary.some((primaryItem) => primaryItem.href === item.href));
   const initials = user.name.split(" ").map((item) => item[0]).slice(0, 2).join("");
@@ -81,7 +78,7 @@ export function RoleShell({ role, user, children }: { role: Role; user: { name: 
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, []);
 
-  const links = (variant: "desktop" | "drawer") => <nav className={variant === "drawer" ? "role-drawer-links" : ""} aria-label="Основная навигация">
+  const links = (variant: "desktop" | "drawer") => <nav className={variant === "drawer" ? "role-drawer-links" : ""} aria-label={t("navigation")}>
     {nav.map((item) => {
       const Icon = icons[item.key];
       return <Link className={isActive(item) ? "active" : ""} href={item.href} key={item.href} onClick={() => setDrawer(false)}><Icon size={18} /><span>{item.label}</span></Link>;
@@ -92,20 +89,20 @@ export function RoleShell({ role, user, children }: { role: Role; user: { name: 
     <aside className="sidebar role-sidebar">
       <Link className="brand role-logo" href={`/${role}`} aria-label="Happy Town"><Logo size={84} /></Link>
       {links("desktop")}
-      <div className="help-card"><b>Есть вопросы?</b><span>Свяжитесь с нами</span><strong>+7 701 524 1191</strong></div>
+      <div className="help-card"><b>{t("questions")}</b><span>{t("contact")}</span><strong>+7 701 524 1191</strong></div>
       <small className="copyright">© Happy Town · 2026</small>
     </aside>
 
-    {drawer && <button className="drawer-backdrop" onClick={() => setDrawer(false)} aria-label="Закрыть меню" />}
+    {drawer && <button className="drawer-backdrop" onClick={() => setDrawer(false)} aria-label={t("closeMenu")} />}
     <aside className={`mobile-drawer role-mobile-drawer ${drawer ? "open" : ""}`} aria-hidden={!drawer}>
       <header>
-        <Link href={`/${role}`} onClick={() => setDrawer(false)} aria-label="Главная Happy Town"><Logo size={54} /></Link>
-        <button className="icon-btn" onClick={() => setDrawer(false)} aria-label="Закрыть меню"><X size={20} /></button>
+        <Link href={`/${role}`} onClick={() => setDrawer(false)} aria-label={t("happyHome")}><Logo size={54} /></Link>
+        <button className="icon-btn" onClick={() => setDrawer(false)} aria-label={t("closeMenu")}><X size={20} /></button>
       </header>
       {links("drawer")}
       <div className="drawer-footer">
-        <div className="help-card"><b>Нужна помощь?</b><span>Поддержка Happy Town</span></div>
-        <button className="mobile-logout" onClick={() => { setDrawer(false); setLogoutOpen(true); }}><LogOut size={19} /><span>Выйти из аккаунта</span><ChevronRight size={17} /></button>
+        <div className="help-card"><b>{t("help")}</b><span>{t("support")}</span></div>
+        <button className="mobile-logout" onClick={() => { setDrawer(false); setLogoutOpen(true); }}><LogOut size={19} /><span>{t("logoutAccount")}</span><ChevronRight size={17} /></button>
       </div>
     </aside>
 
@@ -113,36 +110,36 @@ export function RoleShell({ role, user, children }: { role: Role; user: { name: 
       <header className="topbar role-topbar">
         <div className="mobile-header-row">
           <Logo size={54} />
-          <button className="icon-btn menu-trigger" onClick={() => setDrawer(true)} aria-label="Открыть меню"><Menu size={21} /></button>
+          <div className="mobile-header-actions"><LanguageSwitcher /><button className="icon-btn menu-trigger" onClick={() => setDrawer(true)} aria-label={t("openMenu")}><Menu size={21} /></button></div>
         </div>
-        <div className="page-heading"><p className="eyebrow">Электронный дневник</p><h1>{title}</h1></div>
-        <div className="top-actions desktop-actions">
-          <div className="profile-chip"><span className="avatar">{initials}</span><span><b>{user.name}</b><small>{role === "teacher" ? "Учитель" : "Родитель"}</small></span></div>
-          <button className="icon-btn" onClick={() => setLogoutOpen(true)} aria-label="Выйти"><LogOut size={18} /></button>
+        <div className="page-heading"><p className="eyebrow">{t("diary")}</p><h1>{title}</h1></div>
+        <div className="top-actions desktop-actions"><LanguageSwitcher />
+          <div className="profile-chip"><span className="avatar">{initials}</span><span><b>{user.name}</b><small>{t(role)}</small></span></div>
+          <button className="icon-btn" onClick={() => setLogoutOpen(true)} aria-label={t("logout")}><LogOut size={18} /></button>
         </div>
       </header>
       <div className="content role-content">{children}</div>
     </main>
 
-    <nav className="mobile-nav role-mobile-nav" aria-label="Мобильная навигация">
+    <nav className="mobile-nav role-mobile-nav" aria-label={t("mobileNavigation")}>
       {primary.map((item) => { const Icon = icons[item.key]; return <Link href={item.href} className={isActive(item) ? "active" : ""} key={item.href}><Icon size={21} /><span>{item.label}</span></Link>; })}
-      <button className={more.some(isActive) ? "active" : ""} onClick={() => setMoreOpen(true)} aria-label="Открыть дополнительные разделы"><MoreHorizontal size={22} /><span>Ещё</span></button>
+      <button className={more.some(isActive) ? "active" : ""} onClick={() => setMoreOpen(true)} aria-label={t("openMore")}><MoreHorizontal size={22} /><span>{t("more")}</span></button>
     </nav>
 
     {moreOpen && <div className="dialog-layer mobile-more-layer role-more-layer" onMouseDown={(event) => event.target === event.currentTarget && setMoreOpen(false)}>
-      <section className="mobile-more-sheet" role="dialog" aria-modal="true" aria-label="Дополнительные разделы">
-        <div className="mobile-sheet-title"><span /><h2>Ещё</h2><button onClick={() => setMoreOpen(false)} aria-label="Закрыть"><X size={20} /></button></div>
+      <section className="mobile-more-sheet" role="dialog" aria-modal="true" aria-label={t("moreSections")}>
+        <div className="mobile-sheet-title"><span /><h2>{t("more")}</h2><button onClick={() => setMoreOpen(false)} aria-label={t("close")}><X size={20} /></button></div>
         <nav>{more.map((item) => { const Icon = icons[item.key]; return <Link href={item.href} className={isActive(item) ? "active" : ""} onClick={() => setMoreOpen(false)} key={item.href}><Icon size={20} /><span>{item.label}</span><ChevronRight size={17} /></Link>; })}
-          <button className="mobile-logout" onClick={() => { setMoreOpen(false); setLogoutOpen(true); }}><LogOut size={20} /><span>Выйти из аккаунта</span><ChevronRight size={17} /></button>
+          <button className="mobile-logout" onClick={() => { setMoreOpen(false); setLogoutOpen(true); }}><LogOut size={20} /><span>{t("logoutAccount")}</span><ChevronRight size={17} /></button>
         </nav>
       </section>
     </div>}
 
     {logoutOpen && <div className="admin-modal-layer" onMouseDown={(event) => event.target === event.currentTarget && setLogoutOpen(false)}>
       <section className="admin-modal compact" role="dialog" aria-modal="true" aria-labelledby="role-logout-title">
-        <header><div><span>Happy Town</span><h2 id="role-logout-title">Выйти из аккаунта?</h2></div><button onClick={() => setLogoutOpen(false)} aria-label="Закрыть"><X /></button></header>
-        <p className="logout-copy">Вы уверены, что хотите выйти из аккаунта?</p>
-        <div className="admin-form-actions"><button className="btn secondary" onClick={() => setLogoutOpen(false)}>Отмена</button><button className="btn danger-btn" onClick={() => signOut({ callbackUrl: "/login" })}><LogOut size={17} />Выйти</button></div>
+        <header><div><span>Happy Town</span><h2 id="role-logout-title">{t("logoutQuestion")}</h2></div><button onClick={() => setLogoutOpen(false)} aria-label={t("close")}><X /></button></header>
+        <p className="logout-copy">{t("logoutConfirm")}</p>
+        <div className="admin-form-actions"><button className="btn secondary" onClick={() => setLogoutOpen(false)}>{t("cancel")}</button><button className="btn danger-btn" onClick={() => signOut({ callbackUrl: "/login" })}><LogOut size={17} />{t("logout")}</button></div>
       </section>
     </div>}
   </div>;

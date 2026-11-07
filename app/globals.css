@@ -394,3 +394,14 @@ img{max-width:100%;height:auto}
   html:focus-within{scroll-behavior:auto}
   *,*::before,*::after{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important;animation-iteration-count:1!important}
 }
+.language-switcher{display:inline-flex;align-items:center;border:1px solid var(--border);border-radius:12px;background:#fff;padding:2px;flex:none}
+.language-switcher button{min-width:44px;min-height:40px;padding:0 8px;border:0;border-radius:9px;background:transparent;color:var(--muted);font-weight:700;font-size:12px}
+.language-switcher button[aria-pressed="true"]{background:var(--brand-soft);color:var(--brand)}
+.language-switcher button:hover{color:var(--brand)}
+.language-switcher button:focus-visible{outline:2px solid var(--brand);outline-offset:-2px}
+.login-language{display:flex;justify-content:flex-end;margin-bottom:8px}
+.login-page{grid-template-columns:minmax(0,1fr)}
+.login-card{min-width:0;justify-self:center}
+.login-card form{grid-template-columns:minmax(0,1fr)}
+.login-card label,.login-card label>div{min-width:0}
+@media(max-width:760px){.language-switcher button{min-width:44px;min-height:40px}.role-topbar .mobile-header-actions{display:flex;align-items:center;gap:8px}}

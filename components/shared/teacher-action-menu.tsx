@@ -3,6 +3,9 @@
 import { Archive, Check, Ellipsis, Loader2, Pencil, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useI18n } from "../i18n-provider";
+import { teacherMessage, type TeacherMessage } from "../../lib/i18n/teacher";
+import { apiErrorMessage } from "../../lib/i18n/api-errors";
 
 type Kind = "lesson" | "homework" | "word" | "test";
 
@@ -25,6 +28,8 @@ const actions: Record<Kind, { update: string; archive: string; idKey: string }> 
  * instead of repeating the same records in a separate management section.
  */
 export function TeacherActionMenu({ kind, item }: { kind: Kind; item: Item }) {
+  const {locale}=useI18n();
+  const t=(key:TeacherMessage)=>teacherMessage(locale,key);
   const router = useRouter();
   const root = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
@@ -54,14 +59,14 @@ export function TeacherActionMenu({ kind, item }: { kind: Kind; item: Item }) {
         body: JSON.stringify({ action, data: { [config.idKey]: item.id, ...data } }),
       });
       const result = await response.json();
-      if (!response.ok) throw new Error(result.error || "Не удалось выполнить действие");
+      if (!response.ok) throw new Error(apiErrorMessage(locale,result,t("Не удалось выполнить действие")));
       setOpen(false);
       setEditing(false);
       setConfirmingArchive(false);
-      setMessage(action === config.archive ? "Запись перенесена в архив" : "Изменения сохранены");
+      setMessage(action === config.archive ? t("Запись перенесена в архив") : t("Изменения сохранены"));
       router.refresh();
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Не удалось выполнить действие");
+      setMessage(error instanceof Error ? error.message : t("Не удалось выполнить действие"));
     } finally {
       setBusy(false);
     }
@@ -73,26 +78,26 @@ export function TeacherActionMenu({ kind, item }: { kind: Kind; item: Item }) {
   }
 
   return <div className="record-action-menu" ref={root}>
-    <button className="icon-btn record-action-trigger" type="button" aria-label={`Действия: ${item.title}`} aria-expanded={open} onClick={() => setOpen((value) => !value)}>
+    <button className="icon-btn record-action-trigger" type="button" aria-label={`${t("Действия:")} ${item.title}`} aria-expanded={open} onClick={() => setOpen((value) => !value)}>
       <Ellipsis size={19} />
     </button>
     {open && <div className="record-action-popover" role="menu">
-      <button type="button" role="menuitem" onClick={() => { setEditing(true); setOpen(false); }}><Pencil size={16} />Редактировать</button>
-      <button type="button" role="menuitem" className="destructive" disabled={busy} onClick={() => { setConfirmingArchive(true); setOpen(false); }}>{busy ? <Loader2 className="spin" size={16} /> : <Archive size={16} />}В архив</button>
+      <button type="button" role="menuitem" onClick={() => { setEditing(true); setOpen(false); }}><Pencil size={16} />{t("Редактировать")}</button>
+      <button type="button" role="menuitem" className="destructive" disabled={busy} onClick={() => { setConfirmingArchive(true); setOpen(false); }}>{busy ? <Loader2 className="spin" size={16} /> : <Archive size={16} />}{t("В архив")}</button>
     </div>}
     {editing && <div className="dialog-layer" onMouseDown={(event) => event.target === event.currentTarget && !busy && setEditing(false)}>
-      <form className="record-edit-dialog section-card" onSubmit={save} aria-label={`Редактирование: ${item.title}`}>
-        <header><div><span className="eyebrow">Happy Town</span><h2>Редактировать запись</h2></div><button className="icon-btn" type="button" aria-label="Закрыть" onClick={() => setEditing(false)}><X size={18} /></button></header>
-        <label><span>{kind === "word" ? "Слово" : "Название"}</span><input value={title} onChange={(event) => setTitle(event.target.value)} required autoFocus /></label>
-        {kind === "word" && <label><span>Перевод</span><input value={secondary} onChange={(event) => setSecondary(event.target.value)} required /></label>}
-        <footer><button className="btn secondary" type="button" onClick={() => setEditing(false)} disabled={busy}>Отмена</button><button className="btn" disabled={busy}>{busy ? <Loader2 className="spin" /> : <Check size={17} />}Сохранить</button></footer>
+      <form className="record-edit-dialog section-card" onSubmit={save} aria-label={`${t("Редактирование:")} ${item.title}`}>
+        <header><div><span className="eyebrow">Happy Town</span><h2>{t("Редактировать запись")}</h2></div><button className="icon-btn" type="button" aria-label={t("Закрыть")} onClick={() => setEditing(false)}><X size={18} /></button></header>
+        <label><span>{kind === "word" ? t("Слово") : t("Название")}</span><input value={title} onChange={(event) => setTitle(event.target.value)} required autoFocus /></label>
+        {kind === "word" && <label><span>{t("Перевод")}</span><input value={secondary} onChange={(event) => setSecondary(event.target.value)} required /></label>}
+        <footer><button className="btn secondary" type="button" onClick={() => setEditing(false)} disabled={busy}>{t("Отмена")}</button><button className="btn" disabled={busy}>{busy ? <Loader2 className="spin" /> : <Check size={17} />}{t("Сохранить")}</button></footer>
       </form>
     </div>}
     {confirmingArchive && <div className="dialog-layer" onMouseDown={(event) => event.target === event.currentTarget && !busy && setConfirmingArchive(false)}>
       <section className="record-edit-dialog section-card" role="dialog" aria-modal="true" aria-labelledby={`archive-${item.id}`}>
-        <header><div><span className="eyebrow">Happy Town</span><h2 id={`archive-${item.id}`}>Переместить в архив?</h2></div><button className="icon-btn" type="button" aria-label="Закрыть" onClick={() => setConfirmingArchive(false)}><X size={18} /></button></header>
-        <p>Запись «{item.title}» будет скрыта из активного списка. История сохранится.</p>
-        <footer><button className="btn secondary" type="button" onClick={() => setConfirmingArchive(false)} disabled={busy}>Отмена</button><button className="btn danger-btn" type="button" disabled={busy} onClick={() => void run(config.archive)}>{busy ? <Loader2 className="spin" /> : <Archive size={17} />}Архивировать</button></footer>
+        <header><div><span className="eyebrow">Happy Town</span><h2 id={`archive-${item.id}`}>{t("Переместить в архив?")}</h2></div><button className="icon-btn" type="button" aria-label={t("Закрыть")} onClick={() => setConfirmingArchive(false)}><X size={18} /></button></header>
+        <p>{t("Запись «{title}» будет скрыта из активного списка. История сохранится.").replace("{title}",item.title)}</p>
+        <footer><button className="btn secondary" type="button" onClick={() => setConfirmingArchive(false)} disabled={busy}>{t("Отмена")}</button><button className="btn danger-btn" type="button" disabled={busy} onClick={() => void run(config.archive)}>{busy ? <Loader2 className="spin" /> : <Archive size={17} />}{t("Архивировать")}</button></footer>
       </section>
     </div>}
     {message && <span className="record-action-message" role="status">{message}</span>}

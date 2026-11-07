@@ -72,7 +72,7 @@ export async function getAdminPortalData(): Promise<AdminPortalData> {
       units:catalogUnits.map(row=>({id:row.id,bookId:row.bookId,name:row.name,description:row.description??"",bookName:row.book.name,status:status(row.status),topicCount:row._count.topics})),
       topics:catalogTopics.map(row=>({id:row.id,name:row.name,description:row.description??"",unitName:row.unit.name,status:status(row.status)})),
       skills:catalogSkills.map(row=>({id:row.id,code:row.code,name:row.name,description:row.description??"",isActive:row.isActive,courseCount:row._count.courseLinks})),
-      history:history.map(row=>({id:row.id,eventDate:row.eventDate.toISOString().slice(0,10),eventType:row.eventType,title:row.title,description:row.description??"",studentName:fullName(row.student),actorName:row.actor?fullName(row.actor):"Система"})),
+      history:history.map(row=>({id:row.id,eventDate:row.eventDate.toISOString().slice(0,10),eventType:row.eventType,title:row.title,description:row.description??"",studentName:fullName(row.student),actorName:row.actor?fullName(row.actor):"Система",actorIsSystem:!row.actor})),
     },
   };
 }

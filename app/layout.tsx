@@ -1,6 +1,8 @@
 import "@fontsource-variable/inter";
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
+import { cookies } from "next/headers";
+import { I18nProvider } from "../components/i18n-provider";
 
 export const viewport: Viewport = {
   width: "device-width",
@@ -23,6 +25,7 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image", images: ["/og-admin.png"] },
 };
 
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="ru"><body>{children}</body></html>;
+export default async function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  const locale = (await cookies()).get("happy-town-locale")?.value === "en" ? "en" : "ru";
+  return <html lang={locale}><body><I18nProvider initialLocale={locale}>{children}</I18nProvider></body></html>;
 }

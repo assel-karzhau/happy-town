@@ -18,7 +18,8 @@ test("login form accepts only twelve digits and uses a generic error",()=>{
   assert.match(login,/inputMode="numeric"/);
   assert.match(login,/maxLength=\{12\}/);
   assert.match(login,/replace\(\/\\D\/g,""\)/);
-  assert.match(login,/\u041d\u0435\u0432\u0435\u0440\u043d\u044b\u0439 \u0418\u0418\u041d \u0438\u043b\u0438 \u043f\u0430\u0440\u043e\u043b\u044c/);
+  assert.match(login,/setError\("loginError"\)/);
+  assert.match(read("lib/i18n/messages.ts"),/loginError: "Неверный ИИН или пароль"/);
   assert.doesNotMatch(login,/type="email"|\u041d\u0435\u0432\u0435\u0440\u043d\u044b\u0439 email \u0438\u043b\u0438 \u043f\u0430\u0440\u043e\u043b\u044c/);
 });
 

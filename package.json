@@ -23,6 +23,7 @@
     "db:check": "tsx scripts/db-check.ts",
     "db:studio": "prisma studio",
     "typecheck": "tsc --noEmit",
+    "i18n:check": "node scripts/check-i18n-coverage.mjs",
     "verify:access": "tsx scripts/verify-access.ts",
     "verify:roles": "tsx scripts/verify-role-portals.ts",
     "verify:diary": "tsx scripts/verify-diary-pages.ts",

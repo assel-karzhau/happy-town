@@ -10,7 +10,7 @@ export type AdminCatalogData = {
   units: Array<{id:string;bookId:string;name:string;description:string;bookName:string;status:string;topicCount:number}>;
   topics: Array<{id:string;name:string;description:string;unitName:string;status:string}>;
   skills: Array<{id:string;code:string;name:string;description:string;isActive:boolean;courseCount:number}>;
-  history: Array<{id:string;eventDate:string;eventType:string;title:string;description:string;studentName:string;actorName:string}>;
+  history: Array<{id:string;eventDate:string;eventType:string;title:string;description:string;studentName:string;actorName:string;actorIsSystem?:boolean}>;
 };
 
 export type PaymentStatus = "PAID" | "UNPAID";
